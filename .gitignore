@@ -1,4 +1,9 @@
 build/
 dist/*.apk
+dist/*.idsig
 *.iml
 *.idsig
+# 签名证书只留本机，不入库（私钥泄露等于任何人都能给你的 App 签名）
+keystore/
+*.jks
+*.keystore
