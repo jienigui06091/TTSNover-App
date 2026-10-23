@@ -54,7 +54,8 @@ public class Store extends SQLiteOpenHelper {
         Cursor c = getReadableDatabase().rawQuery(
                 "SELECT b.id,b.title,b.author,b.kind,b.cover,b.source_name,b.last_chapter,"
                         + "b.progress_ch,b.opened,b.added,"
-                        + "(SELECT COUNT(*) FROM chapters WHERE book_id=b.id) ch"
+                        + "(SELECT COUNT(*) FROM chapters WHERE book_id=b.id) ch,"
+                        + "b.book_url,b.source_url"
                         + " FROM books b ORDER BY b.opened DESC, b.added DESC", null);
         try {
             while (c.moveToNext()) {
@@ -70,6 +71,8 @@ public class Store extends SQLiteOpenHelper {
                     o.put("progress_ch", c.getInt(7));
                     o.put("ch_count", c.getInt(10));
                     o.put("opened", c.getLong(8));
+                    o.put("book_url", nz(c.getString(11)));
+                    o.put("source_url", nz(c.getString(12)));
                 } catch (Exception ignored) {
                 }
                 out.put(o);

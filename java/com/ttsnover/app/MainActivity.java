@@ -4,6 +4,8 @@ import android.app.Activity;
 import android.app.AlertDialog;
 import android.content.DialogInterface;
 import android.content.Intent;
+import android.graphics.Color;
+import android.graphics.Typeface;
 import android.net.Uri;
 import android.os.Bundle;
 import android.os.Handler;
@@ -17,7 +19,9 @@ import android.widget.ArrayAdapter;
 import android.widget.BaseAdapter;
 import android.widget.Button;
 import android.widget.EditText;
+import android.widget.HorizontalScrollView;
 import android.widget.ImageView;
+import android.widget.LinearLayout;
 import android.widget.ListView;
 import android.widget.ProgressBar;
 import android.widget.Spinner;
@@ -55,6 +59,10 @@ public class MainActivity extends Activity {
     private View layoutShelfEmpty;
     private ImageView ivTabShelf, ivTabSearch, ivTabMe;
     private View llTabShelf, llTabSearch, llTabMe;
+    private HorizontalScrollView hsvSources;
+    private LinearLayout llSourceChips;
+    private final List<JSONObject> rawSourceGroups = new ArrayList<JSONObject>();
+    private String selectedSourceId = "ALL";
     /** 和 tts.py 里的 PRESETS 对齐：顺序不能乱 */
     static final String[] PROV = {"mimo", "fish", "siliconflow", ""};
     static final String[] PROV_LABEL = {"小米 MiMo（预置/设计/克隆）", "Fish Audio（克隆音色）",
@@ -137,7 +145,10 @@ public class MainActivity extends Activity {
         lvSearch.setOnItemClickListener(new AdapterView.OnItemClickListener() {
             @Override
             public void onItemClick(AdapterView<?> p, View v, int pos, long id) {
-                addBook(found.get(pos));
+                if (pos < 0 || pos >= found.size()) return;
+                JSONObject bk = found.get(pos);
+                if (bk.optBoolean("_is_header", false)) return;
+                showBookDetailsDialog(bk);
             }
         });
 
@@ -232,6 +243,8 @@ public class MainActivity extends Activity {
         llTabShelf = findViewById(R.id.llTabShelf);
         llTabSearch = findViewById(R.id.llTabSearch);
         llTabMe = findViewById(R.id.llTabMe);
+        hsvSources = findViewById(R.id.hsvSources);
+        llSourceChips = findViewById(R.id.llSourceChips);
         tvStat = findViewById(R.id.tvStat);
         tvAccount = findViewById(R.id.tvAccount);
         tvServer = findViewById(R.id.tvServer);
@@ -431,6 +444,9 @@ public class MainActivity extends Activity {
         btnSearch.setText("搜索中");
         tvStat.setText("正在搜索各书源…（最多约 12 秒）");
         found.clear();
+        rawSourceGroups.clear();
+        selectedSourceId = "ALL";
+        if (hsvSources != null) hsvSources.setVisibility(View.GONE);
         foundAdapter.notifyDataSetChanged();
         pool.execute(new Runnable() {
             @Override
@@ -444,7 +460,10 @@ public class MainActivity extends Activity {
                             searching = false;
                             btnSearch.setEnabled(true);
                             btnSearch.setText("搜索");
-                            found.clear();
+                            rawSourceGroups.clear();
+                            selectedSourceId = "ALL";
+
+                            int totalBooks = 0;
                             int srcOk = 0, srcAll = 0;
                             if (res != null) {
                                 for (int i = 0; i < res.length(); i++) {
@@ -452,25 +471,35 @@ public class MainActivity extends Activity {
                                     if (g == null) continue;
                                     srcAll++;
                                     JSONArray books = g.optJSONArray("books");
-                                    if (books != null && books.length() > 0) srcOk++;
-                                    if (books == null) continue;
-                                    for (int k = 0; k < books.length(); k++) {
-                                        JSONObject bk = books.optJSONObject(k);
-                                        if (bk == null) continue;
-                                        try {
-                                            bk.put("_sid", g.optString("sid"));
-                                            bk.put("_source", g.optString("source"));
-                                        } catch (Exception ignored) {
+                                    int bCount = books != null ? books.length() : 0;
+                                    if (bCount > 0) {
+                                        srcOk++;
+                                        totalBooks += bCount;
+                                        for (int k = 0; k < bCount; k++) {
+                                            JSONObject bk = books.optJSONObject(k);
+                                            if (bk != null) {
+                                                try {
+                                                    bk.put("_sid", g.optString("sid"));
+                                                    bk.put("_source", g.optString("source"));
+                                                } catch (Exception ignored) {
+                                                }
+                                            }
                                         }
-                                        found.add(bk);
+                                        rawSourceGroups.add(g);
                                     }
                                 }
                             }
-                            foundAdapter.notifyDataSetChanged();
+
                             JSONObject st = r.optJSONObject("stats");
                             String ms = st != null ? String.valueOf(st.optInt("ms")) : "?";
-                            tvStat.setText("命中 " + found.size() + " 本 / " + srcOk + "/" + srcAll
-                                    + " 个源有结果 · " + ms + "ms · 点一本加入书架");
+                            if (totalBooks == 0) {
+                                tvStat.setText("共搜索 " + srcAll + " 个书源，未找到匹配书籍 · " + ms + "ms");
+                                if (hsvSources != null) hsvSources.setVisibility(View.GONE);
+                            } else {
+                                tvStat.setText("在 " + srcOk + " 个书源中找到 " + totalBooks + " 本书 · " + ms + "ms · 点卡片详情试读，点右侧+加书架");
+                                buildSourceChips(totalBooks);
+                            }
+                            refreshSearchDisplayList();
                         }
                     });
                 } catch (final Exception e) {
@@ -488,9 +517,157 @@ public class MainActivity extends Activity {
         });
     }
 
-    private void addBook(final JSONObject bk) {
+    private void buildSourceChips(int totalBooks) {
+        if (llSourceChips == null || hsvSources == null) return;
+        llSourceChips.removeAllViews();
+        if (rawSourceGroups.isEmpty()) {
+            hsvSources.setVisibility(View.GONE);
+            return;
+        }
+        hsvSources.setVisibility(View.VISIBLE);
+
+        final TextView chipAll = createSourceChip("全部 (" + totalBooks + ")", "ALL".equals(selectedSourceId));
+        chipAll.setTag("ALL");
+        chipAll.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                selectedSourceId = "ALL";
+                updateChipStyles();
+                refreshSearchDisplayList();
+            }
+        });
+        llSourceChips.addView(chipAll);
+
+        for (int i = 0; i < rawSourceGroups.size(); i++) {
+            final JSONObject g = rawSourceGroups.get(i);
+            final String sid = g.optString("sid");
+            final String sName = g.optString("source", "未知源");
+            JSONArray books = g.optJSONArray("books");
+            int count = books != null ? books.length() : 0;
+
+            final TextView chip = createSourceChip(sName + " (" + count + ")", sid.equals(selectedSourceId));
+            chip.setTag(sid);
+            chip.setOnClickListener(new View.OnClickListener() {
+                @Override
+                public void onClick(View v) {
+                    selectedSourceId = sid;
+                    updateChipStyles();
+                    refreshSearchDisplayList();
+                }
+            });
+            llSourceChips.addView(chip);
+        }
+    }
+
+    private TextView createSourceChip(String text, boolean selected) {
+        TextView tv = new TextView(this);
+        tv.setText(text);
+        tv.setTextSize(12);
+        tv.setPadding(28, 12, 28, 12);
+        LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT);
+        lp.rightMargin = 16;
+        tv.setLayoutParams(lp);
+
+        if (selected) {
+            tv.setBackgroundResource(R.drawable.bg_btn_pill);
+            tv.setTextColor(Color.WHITE);
+            tv.setTypeface(null, Typeface.BOLD);
+        } else {
+            tv.setBackgroundResource(R.drawable.bg_tag);
+            tv.setTextColor(getResources().getColor(R.color.fg2));
+            tv.setTypeface(null, Typeface.NORMAL);
+        }
+        return tv;
+    }
+
+    private void updateChipStyles() {
+        if (llSourceChips == null) return;
+        for (int i = 0; i < llSourceChips.getChildCount(); i++) {
+            View child = llSourceChips.getChildAt(i);
+            if (child instanceof TextView) {
+                TextView tv = (TextView) child;
+                Object tag = tv.getTag();
+                boolean active = (tag != null && tag.equals(selectedSourceId));
+                if (active) {
+                    tv.setBackgroundResource(R.drawable.bg_btn_pill);
+                    tv.setTextColor(Color.WHITE);
+                    tv.setTypeface(null, Typeface.BOLD);
+                } else {
+                    tv.setBackgroundResource(R.drawable.bg_tag);
+                    tv.setTextColor(getResources().getColor(R.color.fg2));
+                    tv.setTypeface(null, Typeface.NORMAL);
+                }
+            }
+        }
+    }
+
+    private void refreshSearchDisplayList() {
+        found.clear();
+        for (JSONObject g : rawSourceGroups) {
+            String sid = g.optString("sid");
+            if (!"ALL".equals(selectedSourceId) && !selectedSourceId.equals(sid)) {
+                continue;
+            }
+            JSONArray books = g.optJSONArray("books");
+            if (books == null || books.length() == 0) continue;
+
+            try {
+                JSONObject header = new JSONObject();
+                header.put("_is_header", true);
+                header.put("source", g.optString("source", "未知书源"));
+                header.put("sid", sid);
+                header.put("count", books.length());
+                found.add(header);
+            } catch (Exception ignored) {
+            }
+
+            for (int k = 0; k < books.length(); k++) {
+                JSONObject bk = books.optJSONObject(k);
+                if (bk != null) {
+                    found.add(bk);
+                }
+            }
+        }
+        foundAdapter.notifyDataSetChanged();
+    }
+
+    private boolean isBookOnShelf(String url, String name, String author) {
+        if (shelf == null || shelf.isEmpty()) return false;
+        for (JSONObject b : shelf) {
+            String bUrl = b.optString("book_url", "");
+            if (!bUrl.isEmpty() && !url.isEmpty() && bUrl.equals(url)) return true;
+            String bTitle = b.optString("title", "");
+            if (!bTitle.isEmpty() && bTitle.equals(name)) {
+                String bAuthor = b.optString("author", "");
+                if (TextUtils.isEmpty(author) || TextUtils.isEmpty(bAuthor) || author.equals(bAuthor)) {
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+
+    private JSONObject getShelfBook(String url, String name) {
+        if (shelf == null) return null;
+        for (JSONObject b : shelf) {
+            if (!url.isEmpty() && url.equals(b.optString("book_url", ""))) return b;
+            if (name.equals(b.optString("title", ""))) return b;
+        }
+        return null;
+    }
+
+    private void manualAddBook(final JSONObject bk, final TextView btnView) {
+        manualAddBook(bk, btnView, false);
+    }
+
+    private void manualAddBook(final JSONObject bk, final TextView btnView, final boolean openAfter) {
+        if (btnView != null) {
+            btnView.setText("添加中…");
+            btnView.setEnabled(false);
+        }
         final String name = bk.optString("name");
-        tvStat.setText("正在抓目录：《" + name + "》…");
+        Toast.makeText(this, "正在抓取《" + name + "》并加入书架…", Toast.LENGTH_SHORT).show();
         pool.execute(new Runnable() {
             @Override
             public void run() {
@@ -500,23 +677,32 @@ public class MainActivity extends Activity {
                     book.put("author", bk.optString("author"));
                     book.put("url", bk.optString("url"));
                     JSONObject body = new JSONObject();
-                    body.put("sid", bk.optString("_sid"));
-                    if (bk.optString("_sid").isEmpty()) body.put("sid", bk.optString("sid"));
+                    String sid = bk.optString("_sid");
+                    if (sid.isEmpty()) sid = bk.optString("sid");
+                    body.put("sid", sid);
                     body.put("book", book);
+
                     final JSONObject r = Api.post("/api/src/add", body);
                     ui.post(new Runnable() {
                         @Override
                         public void run() {
                             int bid = r.optInt("id");
                             int n = r.optInt("chapters");
-                            tvStat.setText("已加入书架：" + n + " 章");
+                            Toast.makeText(MainActivity.this, "《" + name + "》已成功加入书架！共 " + n + " 章", Toast.LENGTH_SHORT).show();
                             loadShelf();
-                            if (bid > 0) {
-                                Intent i = new Intent(MainActivity.this, TocActivity.class);
+                            if (btnView != null) {
+                                btnView.setText("已在书架");
+                                btnView.setBackgroundResource(R.drawable.bg_tag);
+                                btnView.setTextColor(getResources().getColor(R.color.fg3));
+                                btnView.setEnabled(false);
+                            }
+                            foundAdapter.notifyDataSetChanged();
+                            if (openAfter && bid > 0) {
+                                Intent i = new Intent(MainActivity.this, ReaderActivity.class);
                                 i.putExtra("bid", bid);
+                                i.putExtra("idx", 0);
                                 i.putExtra("title", name);
                                 i.putExtra("count", n);
-                                i.putExtra("cur", 0);
                                 startActivity(i);
                             }
                         }
@@ -525,12 +711,66 @@ public class MainActivity extends Activity {
                     ui.post(new Runnable() {
                         @Override
                         public void run() {
-                            tvStat.setText("加入失败：" + Api.errText(e));
+                            if (btnView != null) {
+                                btnView.setText("+ 书架");
+                                btnView.setEnabled(true);
+                            }
+                            Toast.makeText(MainActivity.this, "加入失败：" + Api.errText(e), Toast.LENGTH_LONG).show();
                         }
                     });
                 }
             }
         });
+    }
+
+    private void showBookDetailsDialog(final JSONObject bk) {
+        final String name = bk.optString("name");
+        final String author = bk.optString("author");
+        final String source = bk.optString("_source");
+        final String latest = bk.optString("latest", "");
+        final String url = bk.optString("url", "");
+        final boolean onShelf = isBookOnShelf(url, name, author);
+
+        StringBuilder sb = new StringBuilder();
+        sb.append("作者：").append(TextUtils.isEmpty(author) ? "佚名" : author).append("\n");
+        sb.append("书源：").append(source).append("\n");
+        if (!latest.isEmpty()) {
+            sb.append("最新章节：").append(latest).append("\n");
+        }
+        sb.append("书籍链接：").append(url);
+
+        AlertDialog.Builder b = new AlertDialog.Builder(this)
+                .setTitle("《" + name + "》")
+                .setMessage(sb.toString())
+                .setNegativeButton("关闭", null);
+
+        if (onShelf) {
+            b.setPositiveButton("已在书架（前往阅读）", new DialogInterface.OnClickListener() {
+                @Override
+                public void onClick(DialogInterface dialog, int which) {
+                    JSONObject exist = getShelfBook(url, name);
+                    if (exist != null) {
+                        openBook(exist);
+                    } else {
+                        Toast.makeText(MainActivity.this, "已在书架中", Toast.LENGTH_SHORT).show();
+                    }
+                }
+            });
+        } else {
+            b.setPositiveButton("+ 手动加入书架", new DialogInterface.OnClickListener() {
+                @Override
+                public void onClick(DialogInterface dialog, int which) {
+                    manualAddBook(bk, null, false);
+                }
+            });
+            b.setNeutralButton("试读全书", new DialogInterface.OnClickListener() {
+                @Override
+                public void onClick(DialogInterface dialog, int which) {
+                    manualAddBook(bk, null, true);
+                }
+            });
+        }
+        b.show();
     }
 
     // ---------------- 我的 ----------------
@@ -989,12 +1229,29 @@ public class MainActivity extends Activity {
         }
 
         @Override
+        public int getItemViewType(int position) {
+            if (searchMode && position >= 0 && position < found.size()) {
+                return found.get(position).optBoolean("_is_header", false) ? 1 : 0;
+            }
+            return 0;
+        }
+
+        @Override
+        public int getViewTypeCount() {
+            return searchMode ? 2 : 1;
+        }
+
+        @Override
+        public boolean isEnabled(int position) {
+            if (searchMode && position >= 0 && position < found.size()) {
+                return !found.get(position).optBoolean("_is_header", false);
+            }
+            return true;
+        }
+
+        @Override
         public View getView(int i, View cv, ViewGroup parent) {
             View v = cv;
-            if (v == null) {
-                v = LayoutInflater.from(MainActivity.this).inflate(
-                        searchMode ? R.layout.item_search : R.layout.item_book, parent, false);
-            }
             JSONObject o = searchMode ? found.get(i) : shelf.get(i);
             int[] covers = {
                 R.drawable.bg_book_cover_1,
@@ -1003,10 +1260,30 @@ public class MainActivity extends Activity {
                 R.drawable.bg_book_cover_4
             };
             if (searchMode) {
-                String name = o.optString("name", "");
-                String author = o.optString("author", "");
-                String src = o.optString("_source", "");
-                String m = o.optString("matched", "");
+                boolean isHeader = o.optBoolean("_is_header", false);
+                if (isHeader) {
+                    if (v == null || v.findViewById(R.id.tvHeaderSourceName) == null) {
+                        v = LayoutInflater.from(MainActivity.this).inflate(
+                                R.layout.item_search_header, parent, false);
+                    }
+                    TextView tvName = v.findViewById(R.id.tvHeaderSourceName);
+                    TextView tvCount = v.findViewById(R.id.tvHeaderCount);
+                    if (tvName != null) tvName.setText(o.optString("source", "未知书源"));
+                    if (tvCount != null) tvCount.setText("找到 " + o.optInt("count", 0) + " 本");
+                    return v;
+                }
+
+                if (v == null || v.findViewById(R.id.tvSTitle) == null) {
+                    v = LayoutInflater.from(MainActivity.this).inflate(
+                            R.layout.item_search, parent, false);
+                }
+
+                final JSONObject bk = o;
+                final String name = bk.optString("name", "");
+                final String author = bk.optString("author", "");
+                final String src = bk.optString("_source", "");
+                final String m = bk.optString("matched", "");
+                final String url = bk.optString("url", "");
 
                 View flCover = v.findViewById(R.id.flSCover);
                 if (flCover != null) {
@@ -1022,12 +1299,18 @@ public class MainActivity extends Activity {
 
                 TextView tvSMeta = v.findViewById(R.id.tvSMeta);
                 if (tvSMeta != null) {
-                    String meta = (TextUtils.isEmpty(author) ? "佚名" : author) + " · 来源: " + src;
-                    String latest = o.optString("latest", "");
+                    StringBuilder meta = new StringBuilder();
+                    meta.append(TextUtils.isEmpty(author) ? "佚名" : author);
+                    String latest = bk.optString("latest", "");
                     if (!TextUtils.isEmpty(latest)) {
-                        meta += "\n最新: " + latest;
+                        meta.append("\n最新: ").append(latest);
                     }
-                    tvSMeta.setText(meta);
+                    tvSMeta.setText(meta.toString());
+                }
+
+                TextView tvSSourceTag = v.findViewById(R.id.tvSSourceTag);
+                if (tvSSourceTag != null) {
+                    tvSSourceTag.setText(src);
                 }
 
                 TextView hit = v.findViewById(R.id.tvSHit);
@@ -1040,7 +1323,36 @@ public class MainActivity extends Activity {
                         hit.setText(m);
                     }
                 }
-            } else {
+
+                final TextView btnAddToShelf = v.findViewById(R.id.btnAddToShelf);
+                if (btnAddToShelf != null) {
+                    final boolean onShelf = isBookOnShelf(url, name, author);
+                    if (onShelf) {
+                        btnAddToShelf.setText("已在书架");
+                        btnAddToShelf.setBackgroundResource(R.drawable.bg_tag);
+                        btnAddToShelf.setTextColor(getResources().getColor(R.color.fg3));
+                        btnAddToShelf.setEnabled(false);
+                        btnAddToShelf.setOnClickListener(null);
+                    } else {
+                        btnAddToShelf.setText("+ 加书架");
+                        btnAddToShelf.setBackgroundResource(R.drawable.bg_btn_pill);
+                        btnAddToShelf.setTextColor(Color.WHITE);
+                        btnAddToShelf.setEnabled(true);
+                        btnAddToShelf.setOnClickListener(new View.OnClickListener() {
+                            @Override
+                            public void onClick(View view) {
+                                manualAddBook(bk, btnAddToShelf, false);
+                            }
+                        });
+                    }
+                }
+                return v;
+            }
+
+            if (v == null || v.findViewById(R.id.tvBTitle) == null) {
+                v = LayoutInflater.from(MainActivity.this).inflate(
+                        R.layout.item_book, parent, false);
+            }
                 String title = o.optString("title", "");
                 String author = o.optString("author", "");
                 int n = o.optInt("ch_count", 0);
@@ -1097,7 +1409,6 @@ public class MainActivity extends Activity {
                 if (pbBook != null) {
                     pbBook.setProgress(percent);
                 }
-            }
             return v;
         }
     }

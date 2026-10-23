@@ -188,6 +188,25 @@
                 android:layout_marginTop="10dp"
                 android:layout_marginBottom="4dp" />
 
+            <!-- 水平书源分类筛选胶囊栏 -->
+            <HorizontalScrollView
+                android:id="@+id/hsvSources"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:scrollbars="none"
+                android:layout_marginTop="4dp"
+                android:layout_marginBottom="8dp"
+                android:visibility="gone">
+
+                <LinearLayout
+                    android:id="@+id/llSourceChips"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal"
+                    android:paddingTop="2dp"
+                    android:paddingBottom="2dp" />
+            </HorizontalScrollView>
+
             <ListView
                 android:id="@+id/lvSearch"
                 android:layout_width="match_parent"
