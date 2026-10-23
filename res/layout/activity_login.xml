@@ -1,0 +1,52 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent" android:layout_height="match_parent"
+    android:fillViewport="true" android:background="@color/bg">
+
+    <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content"
+        android:orientation="vertical" android:padding="24dp" android:gravity="center_vertical">
+
+        <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
+            android:text="TTSNover" android:textSize="30sp" android:textStyle="bold"
+            android:textColor="@color/accent" android:layout_marginTop="40dp" />
+
+        <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
+            android:text="看书 · 听书" android:textColor="@color/fg2" android:textSize="14sp"
+            android:layout_marginTop="6dp" android:layout_marginBottom="28dp" />
+
+        <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
+            android:text="服务器地址" android:textColor="@color/fg2" android:textSize="13sp" />
+        <EditText android:id="@+id/etServer" style="@style/Input"
+            android:layout_width="match_parent" android:layout_height="wrap_content"
+            android:layout_marginTop="6dp" android:hint="https://your-server.com"
+            android:inputType="textUri" android:singleLine="true" />
+
+        <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
+            android:text="账号" android:textColor="@color/fg2" android:textSize="13sp"
+            android:layout_marginTop="16dp" />
+        <EditText android:id="@+id/etUser" style="@style/Input"
+            android:layout_width="match_parent" android:layout_height="wrap_content"
+            android:layout_marginTop="6dp" android:hint="用户名"
+            android:inputType="text" android:singleLine="true" />
+
+        <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
+            android:text="密码" android:textColor="@color/fg2" android:textSize="13sp"
+            android:layout_marginTop="16dp" />
+        <EditText android:id="@+id/etPass" style="@style/Input"
+            android:layout_width="match_parent" android:layout_height="wrap_content"
+            android:layout_marginTop="6dp" android:hint="密码（至少 6 位）"
+            android:inputType="textPassword" android:singleLine="true" />
+
+        <Button android:id="@+id/btnLogin" style="@style/BtnPrimary"
+            android:layout_width="match_parent" android:layout_height="wrap_content"
+            android:layout_marginTop="24dp" android:text="登录" />
+
+        <Button android:id="@+id/btnRegister" style="@style/Btn"
+            android:layout_width="match_parent" android:layout_height="wrap_content"
+            android:layout_marginTop="10dp" android:text="注册新账号" />
+
+        <TextView android:id="@+id/tvMsg" android:layout_width="match_parent"
+            android:layout_height="wrap_content" android:layout_marginTop="18dp"
+            android:textColor="@color/warn" android:textSize="13sp" android:lineSpacingExtra="3dp" />
+    </LinearLayout>
+</ScrollView>

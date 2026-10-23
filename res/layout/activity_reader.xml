@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent" android:layout_height="match_parent"
+    android:orientation="vertical" android:background="@color/bg">
+
+    <LinearLayout android:layout_width="match_parent" android:layout_height="52dp"
+        android:orientation="horizontal" android:gravity="center_vertical"
+        android:paddingLeft="14dp" android:paddingRight="6dp"
+        android:background="@color/bg2">
+        <TextView android:id="@+id/tvChTitle" android:layout_width="0dp"
+            android:layout_weight="1" android:layout_height="wrap_content"
+            android:textColor="@color/fg" android:textSize="14sp"
+            android:maxLines="1" android:ellipsize="end" />
+        <Button android:id="@+id/btnToc" style="@style/Btn"
+            android:layout_width="wrap_content" android:layout_height="36dp"
+            android:minHeight="0dp" android:textSize="12sp" android:text="目录" />
+    </LinearLayout>
+
+    <ScrollView android:id="@+id/svBody" android:layout_width="match_parent"
+        android:layout_height="0dp" android:layout_weight="1" android:padding="18dp">
+        <TextView android:id="@+id/tvBody" android:layout_width="match_parent"
+            android:layout_height="wrap_content" android:textColor="@color/fg"
+            android:textSize="18sp" android:lineSpacingExtra="8dp" android:textIsSelectable="true" />
+    </ScrollView>
+
+    <View android:layout_width="match_parent" android:layout_height="1dp"
+        android:background="@color/line" />
+    <LinearLayout android:layout_width="match_parent" android:layout_height="56dp"
+        android:orientation="horizontal" android:gravity="center_vertical"
+        android:paddingLeft="8dp" android:paddingRight="8dp" android:background="@color/bg2">
+        <Button android:id="@+id/btnPrev" style="@style/Btn"
+            android:layout_width="0dp" android:layout_weight="1"
+            android:layout_height="42dp" android:minHeight="0dp"
+            android:textSize="13sp" android:text="上一章" />
+        <Button android:id="@+id/btnPlay" style="@style/BtnPrimary"
+            android:layout_width="0dp" android:layout_weight="1"
+            android:layout_height="42dp" android:minHeight="0dp"
+            android:layout_marginLeft="8dp" android:layout_marginRight="8dp"
+            android:textSize="13sp" android:text="朗读" />
+        <Button android:id="@+id/btnNext" style="@style/Btn"
+            android:layout_width="0dp" android:layout_weight="1"
+            android:layout_height="42dp" android:minHeight="0dp"
+            android:textSize="13sp" android:text="下一章" />
+    </LinearLayout>
+</LinearLayout>
