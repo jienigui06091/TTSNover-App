@@ -29,6 +29,17 @@ cd ~/code/ttsnover-app
 依赖：`~/android-sdk`（platforms/android-34、build-tools/35.0.0、platform-tools）+ `libs/*.jar`（已随仓库提供）。
 **d8 必须用 35.0.0**：34.0.0 在 JDK 21 上 dex 多个类会内部 NPE。
 
+签名证书 `keystore/ttsnover.jks` **不入库**（私钥泄露等于任何人都能冒名签名）。自己构建时：
+
+```bash
+mkdir -p keystore && keytool -genkeypair -keystore keystore/ttsnover.jks \
+  -alias ttsnovover -keyalg RSA -keysize 2048 -validity 10950 \
+  -storepass "$KS_PASS" -keypass "$KS_PASS" -dname "CN=TTSNover"
+export KS_PASS='你的口令' && ./build.sh
+```
+
+换证书签名会导致覆盖安装失败（`INSTALL_FAILED_UPDATE_INCOMPATIBLE`），正式发版请固定用同一份证书。
+
 ## 安装 / 首次使用
 
 ```bash
