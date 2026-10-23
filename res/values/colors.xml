@@ -1,13 +1,47 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <color name="bg">#FF101014</color>
-    <color name="bg2">#FF17171D</color>
-    <color name="card">#FF1E1E26</color>
-    <color name="line">#FF2A2A35</color>
-    <color name="fg">#FFE6E6EA</color>
-    <color name="fg2">#FF9A9AA8</color>
-    <color name="accent">#FF7AA2F7</color>
-    <color name="accent2">#FF9ECE6A</color>
-    <color name="warn">#FFE0AF68</color>
-    <color name="err">#FFF7768E</color>
+    <!-- 主背景与层级 -->
+    <color name="bg">#0B0F19</color>
+    <color name="bg2">#131B2E</color>
+    <color name="card">#17223B</color>
+    <color name="card_elevated">#1E2C4C</color>
+    <color name="card_pressed">#26375E</color>
+    <color name="line">#233354</color>
+    <color name="line_subtle">#1A2742</color>
+
+    <!-- 前景文字颜色 -->
+    <color name="fg">#F8FAFC</color>
+    <color name="fg2">#94A3B8</color>
+    <color name="fg3">#64748B</color>
+
+    <!-- 主色调与点缀色 -->
+    <color name="accent">#6366F1</color>
+    <color name="accent_pressed">#4F46E5</color>
+    <color name="accent_light">#EEF2FF</color>
+    <color name="accent2">#10B981</color>
+    <color name="accent2_bg">#183D31</color>
+    <color name="warn">#F59E0B</color>
+    <color name="err">#EF4444</color>
+    <color name="purple">#8B5CF6</color>
+
+    <!-- 阅读主题色彩 -->
+    <!-- 1. 暗夜墨黑 (Dark) -->
+    <color name="read_dark_bg">#0E131F</color>
+    <color name="read_dark_fg">#CBD5E1</color>
+    <color name="read_dark_hud">#182238</color>
+
+    <!-- 2. 羊皮纸温和 (Sepia / Parchment) -->
+    <color name="read_sepia_bg">#F4EEDF</color>
+    <color name="read_sepia_fg">#3B2F21</color>
+    <color name="read_sepia_hud">#E8DECA</color>
+
+    <!-- 3. 护眼豆沙绿 (Sage / Eye Care) -->
+    <color name="read_sage_bg">#E3ECE1</color>
+    <color name="read_sage_fg">#233424</color>
+    <color name="read_sage_hud">#D4E2D2</color>
+
+    <!-- 4. OLED 极黑 (OLED Pure Black) -->
+    <color name="read_oled_bg">#000000</color>
+    <color name="read_oled_fg">#D1D5DB</color>
+    <color name="read_oled_hud">#161616</color>
 </resources>

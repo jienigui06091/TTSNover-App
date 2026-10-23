@@ -1,14 +1,52 @@
 <?xml version="1.0" encoding="utf-8"?>
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
-    android:layout_width="match_parent" android:layout_height="wrap_content"
-    android:orientation="horizontal" android:gravity="center_vertical"
-    android:paddingTop="13dp" android:paddingBottom="13dp" android:paddingLeft="4dp"
-    android:paddingRight="4dp">
-    <TextView android:id="@+id/tvCIdx" android:layout_width="52dp"
-        android:layout_height="wrap_content" android:textColor="@color/fg2"
-        android:textSize="12sp" android:maxLines="1" />
-    <TextView android:id="@+id/tvCTitle" android:layout_width="0dp"
-        android:layout_weight="1" android:layout_height="wrap_content"
-        android:textColor="@color/fg" android:textSize="14sp"
-        android:maxLines="1" android:ellipsize="end" />
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="horizontal"
+    android:gravity="center_vertical"
+    android:background="?android:attr/selectableItemBackground"
+    android:paddingTop="14dp"
+    android:paddingBottom="14dp"
+    android:paddingLeft="12dp"
+    android:paddingRight="12dp">
+
+    <!-- 章节序号小胶囊 -->
+    <TextView
+        android:id="@+id/tvCIdx"
+        android:layout_width="44dp"
+        android:layout_height="24dp"
+        android:gravity="center"
+        android:background="@drawable/bg_tag"
+        android:textColor="@color/fg3"
+        android:textSize="11sp"
+        android:textStyle="bold"
+        android:maxLines="1" />
+
+    <!-- 章节标题 -->
+    <TextView
+        android:id="@+id/tvCTitle"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_weight="1"
+        android:layout_marginLeft="12dp"
+        android:textColor="@color/fg"
+        android:textSize="14sp"
+        android:maxLines="1"
+        android:ellipsize="end" />
+
+    <!-- 当前阅读指示徽章 -->
+    <TextView
+        android:id="@+id/tvCHere"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:background="@drawable/bg_tag_accent"
+        android:textColor="@color/accent"
+        android:textSize="11sp"
+        android:text="在读"
+        android:paddingLeft="6dp"
+        android:paddingRight="6dp"
+        android:paddingTop="2dp"
+        android:paddingBottom="2dp"
+        android:layout_marginLeft="8dp"
+        android:visibility="gone" />
 </LinearLayout>

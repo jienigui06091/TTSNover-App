@@ -2,6 +2,7 @@ package com.ttsnover.reader;
 
 import android.app.Activity;
 import android.content.Intent;
+import android.graphics.Typeface;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
@@ -13,11 +14,13 @@ import android.widget.BaseAdapter;
 import android.widget.Button;
 import android.widget.ListView;
 import android.widget.TextView;
+import android.widget.Toast;
 
 import org.json.JSONArray;
 import org.json.JSONObject;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -30,9 +33,10 @@ public class TocActivity extends Activity {
 
     private int bid, cur;
     private String title;
-    private TextView tvTitle, tvMeta;
+    private TextView tvTitle, tvMeta, btnReverse, btnLocate;
     private ListView lv;
     private ChAdapter adapter;
+    private boolean isReversed = false;
 
     @Override
     protected void onCreate(Bundle b) {
@@ -43,28 +47,85 @@ public class TocActivity extends Activity {
         title = getIntent().getStringExtra("title");
         tvTitle = findViewById(R.id.tvTitle);
         tvMeta = findViewById(R.id.tvMeta);
+        btnReverse = findViewById(R.id.btnReverse);
+        btnLocate = findViewById(R.id.btnLocate);
         lv = findViewById(R.id.lvCh);
+
         tvTitle.setText(title == null ? "" : title);
         adapter = new ChAdapter();
         lv.setAdapter(adapter);
 
+        View btnBack = findViewById(R.id.btnBack);
+        if (btnBack != null) {
+            btnBack.setOnClickListener(new View.OnClickListener() {
+                @Override
+                public void onClick(View v) {
+                    finish();
+                }
+            });
+        }
+
         lv.setOnItemClickListener(new AdapterView.OnItemClickListener() {
             @Override
             public void onItemClick(AdapterView<?> p, View v, int pos, long id) {
-                open(pos, 0);
+                JSONObject o = chs.get(pos);
+                open(o.optInt("idx", pos), 0);
             }
         });
+
+        lv.setOnItemLongClickListener(new AdapterView.OnItemLongClickListener() {
+            @Override
+            public boolean onItemLongClick(AdapterView<?> p, View v, int pos, long id) {
+                JSONObject o = chs.get(pos);
+                int targetIdx = o.optInt("idx", pos);
+                TtsService.start(TocActivity.this, bid, targetIdx, title, chs.size());
+                Toast.makeText(TocActivity.this, "开始朗读: " + o.optString("title"), Toast.LENGTH_SHORT).show();
+                return true;
+            }
+        });
+
         findViewById(R.id.btnRead).setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
                 open(cur, 0);
             }
         });
+
+        if (btnReverse != null) {
+            btnReverse.setOnClickListener(new View.OnClickListener() {
+                @Override
+                public void onClick(View v) {
+                    isReversed = !isReversed;
+                    Collections.reverse(chs);
+                    adapter.notifyDataSetChanged();
+                    btnReverse.setText(isReversed ? "正序" : "倒序");
+                }
+            });
+        }
+
+        if (btnLocate != null) {
+            btnLocate.setOnClickListener(new View.OnClickListener() {
+                @Override
+                public void onClick(View v) {
+                    locateCurrent();
+                }
+            });
+        }
+
         load();
     }
 
+    private void locateCurrent() {
+        for (int i = 0; i < chs.size(); i++) {
+            if (chs.get(i).optInt("idx", i) == cur) {
+                lv.setSelection(i);
+                break;
+            }
+        }
+    }
+
     private void load() {
-        tvMeta.setText("加载目录…");
+        tvMeta.setText("加载目录中…");
         pool.execute(new Runnable() {
             @Override
             public void run() {
@@ -81,9 +142,12 @@ public class TocActivity extends Activity {
                                     if (o != null) chs.add(o);
                                 }
                             }
+                            if (isReversed) {
+                                Collections.reverse(chs);
+                            }
                             adapter.notifyDataSetChanged();
-                            tvMeta.setText(chs.size() + " 章 · 读到第 " + (cur + 1) + " 章 · 长按章节可朗读");
-                            if (cur >= 0 && cur < chs.size()) lv.setSelection(cur);
+                            tvMeta.setText("共 " + chs.size() + " 章 · 读至第 " + (cur + 1) + " 章");
+                            locateCurrent();
                         }
                     });
                 } catch (final Exception e) {
@@ -103,7 +167,7 @@ public class TocActivity extends Activity {
     }
 
     private void open(int idx, int off) {
-        if (idx < 0 || idx >= chs.size()) return;
+        if (idx < 0) return;
         Intent i = new Intent(this, ReaderActivity.class);
         i.putExtra("bid", bid);
         i.putExtra("idx", idx);
@@ -144,15 +208,34 @@ public class TocActivity extends Activity {
         @Override
         public View getView(int i, View cv, ViewGroup parent) {
             View v = cv;
-            if (v == null) v = LayoutInflater.from(TocActivity.this)
-                    .inflate(R.layout.item_chapter, parent, false);
+            if (v == null) {
+                v = LayoutInflater.from(TocActivity.this)
+                        .inflate(R.layout.item_chapter, parent, false);
+            }
             JSONObject o = chs.get(i);
             int idx = o.optInt("idx", i);
-            ((TextView) v.findViewById(R.id.tvCIdx)).setText(String.valueOf(idx + 1));
+
+            TextView tvCIdx = v.findViewById(R.id.tvCIdx);
             TextView t = v.findViewById(R.id.tvCTitle);
+            View tvCHere = v.findViewById(R.id.tvCHere);
+
+            tvCIdx.setText(String.valueOf(idx + 1));
             t.setText(o.optString("title"));
-            boolean here = idx == cur;
-            t.setTextColor(getResources().getColor(here ? R.color.accent : R.color.fg));
+
+            boolean here = (idx == cur);
+            if (here) {
+                t.setTextColor(getResources().getColor(R.color.accent));
+                t.setTypeface(null, Typeface.BOLD);
+                tvCIdx.setTextColor(getResources().getColor(R.color.accent));
+                tvCIdx.setBackgroundResource(R.drawable.bg_tag_accent);
+                if (tvCHere != null) tvCHere.setVisibility(View.VISIBLE);
+            } else {
+                t.setTextColor(getResources().getColor(R.color.fg));
+                t.setTypeface(null, Typeface.NORMAL);
+                tvCIdx.setTextColor(getResources().getColor(R.color.fg3));
+                tvCIdx.setBackgroundResource(R.drawable.bg_tag);
+                if (tvCHere != null) tvCHere.setVisibility(View.GONE);
+            }
             return v;
         }
     }

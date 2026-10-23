@@ -35,6 +35,15 @@ public class Prefs {
 
     public static void setTtsSpeed(float v) { sp().edit().putFloat("ttsSpeed", v).apply(); }
 
+    // ---- 阅读界面偏好：主题背景与字号 ----
+    public static String readerTheme() { return sp().getString("readerTheme", "dark"); }
+
+    public static void setReaderTheme(String v) { sp().edit().putString("readerTheme", v).apply(); }
+
+    public static int readerFontSize() { return sp().getInt("readerFontSize", 18); }
+
+    public static void setReaderFontSize(int v) { sp().edit().putInt("readerFontSize", v).apply(); }
+
     public static void clearToken() {
         sp().edit().remove("token").remove("user").apply();
     }

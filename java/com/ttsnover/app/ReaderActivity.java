@@ -1,16 +1,23 @@
 package com.ttsnover.reader;
 
 import android.app.Activity;
+import android.app.AlertDialog;
+import android.content.DialogInterface;
 import android.content.Intent;
 import android.content.pm.PackageManager;
+import android.graphics.Color;
 import android.os.Build;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
+import android.view.Gravity;
 import android.view.View;
 import android.widget.Button;
+import android.widget.ImageButton;
+import android.widget.LinearLayout;
 import android.widget.ScrollView;
 import android.widget.TextView;
+import android.widget.Toast;
 
 import org.json.JSONArray;
 import org.json.JSONObject;
@@ -30,9 +37,16 @@ public class ReaderActivity extends Activity {
     private String bookTitle;
     private float pendingOff = -1;
 
-    private TextView tvChTitle, tvBody;
+    private View rootReader;
+    private View layoutTopHud, layoutBottomHud;
+    private TextView tvChTitle, tvBookSubtitle, tvBodyTitle, tvBody, tvProgressInfo;
     private ScrollView sv;
-    private Button btnPrev, btnNext, btnPlay;
+    private Button btnPrev, btnNext, btnPlay, btnToc;
+    private ImageButton btnBack, btnStyle;
+
+    private boolean hudVisible = true;
+    private int currentFontSize = 18;
+    private String currentTheme = "dark";
 
     @Override
     protected void onCreate(Bundle b) {
@@ -44,12 +58,48 @@ public class ReaderActivity extends Activity {
         bookTitle = getIntent().getStringExtra("title");
         pendingOff = getIntent().getFloatExtra("off", -1f);
 
+        rootReader = findViewById(R.id.rootReader);
+        layoutTopHud = findViewById(R.id.layoutTopHud);
+        layoutBottomHud = findViewById(R.id.layoutBottomHud);
         tvChTitle = findViewById(R.id.tvChTitle);
+        tvBookSubtitle = findViewById(R.id.tvBookSubtitle);
+        tvBodyTitle = findViewById(R.id.tvBodyTitle);
         tvBody = findViewById(R.id.tvBody);
+        tvProgressInfo = findViewById(R.id.tvProgressInfo);
         sv = findViewById(R.id.svBody);
         btnPrev = findViewById(R.id.btnPrev);
         btnNext = findViewById(R.id.btnNext);
         btnPlay = findViewById(R.id.btnPlay);
+        btnToc = findViewById(R.id.btnToc);
+        btnBack = findViewById(R.id.btnBack);
+        btnStyle = findViewById(R.id.btnStyle);
+
+        if (bookTitle != null) {
+            tvBookSubtitle.setText(bookTitle);
+        }
+
+        currentFontSize = Prefs.readerFontSize();
+        currentTheme = Prefs.readerTheme();
+        applyTheme(currentTheme);
+        applyFontSize(currentFontSize);
+
+        if (btnBack != null) {
+            btnBack.setOnClickListener(new View.OnClickListener() {
+                @Override
+                public void onClick(View v) {
+                    finish();
+                }
+            });
+        }
+
+        if (btnStyle != null) {
+            btnStyle.setOnClickListener(new View.OnClickListener() {
+                @Override
+                public void onClick(View v) {
+                    showStyleDialog();
+                }
+            });
+        }
 
         btnPrev.setOnClickListener(new View.OnClickListener() {
             @Override
@@ -63,7 +113,7 @@ public class ReaderActivity extends Activity {
                 go(idx + 1);
             }
         });
-        findViewById(R.id.btnToc).setOnClickListener(new View.OnClickListener() {
+        btnToc.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
                 Intent i = new Intent(ReaderActivity.this, TocActivity.class);
@@ -81,8 +131,159 @@ public class ReaderActivity extends Activity {
             }
         });
 
+        // 点击正文切换沉浸式全屏 / 控制栏显示
+        View.OnClickListener toggleListener = new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                toggleHud();
+            }
+        };
+        tvBody.setOnClickListener(toggleListener);
+        sv.setOnClickListener(toggleListener);
+
         load();
         ui.postDelayed(tick, 600);
+    }
+
+    private void toggleHud() {
+        hudVisible = !hudVisible;
+        int vis = hudVisible ? View.VISIBLE : View.GONE;
+        if (layoutTopHud != null) layoutTopHud.setVisibility(vis);
+        if (layoutBottomHud != null) layoutBottomHud.setVisibility(vis);
+    }
+
+    private void applyFontSize(int size) {
+        currentFontSize = Math.max(14, Math.min(28, size));
+        Prefs.setReaderFontSize(currentFontSize);
+        if (tvBody != null) {
+            tvBody.setTextSize(currentFontSize);
+        }
+    }
+
+    private void applyTheme(String theme) {
+        currentTheme = theme;
+        Prefs.setReaderTheme(currentTheme);
+        int bgColor;
+        int fgColor;
+
+        if ("sepia".equals(theme)) {
+            bgColor = getResources().getColor(R.color.read_sepia_bg);
+            fgColor = getResources().getColor(R.color.read_sepia_fg);
+        } else if ("sage".equals(theme)) {
+            bgColor = getResources().getColor(R.color.read_sage_bg);
+            fgColor = getResources().getColor(R.color.read_sage_fg);
+        } else if ("oled".equals(theme)) {
+            bgColor = getResources().getColor(R.color.read_oled_bg);
+            fgColor = getResources().getColor(R.color.read_oled_fg);
+        } else {
+            bgColor = getResources().getColor(R.color.read_dark_bg);
+            fgColor = getResources().getColor(R.color.read_dark_fg);
+        }
+
+        if (rootReader != null) rootReader.setBackgroundColor(bgColor);
+        if (tvBody != null) tvBody.setTextColor(fgColor);
+        if (tvBodyTitle != null) tvBodyTitle.setTextColor(fgColor);
+    }
+
+    private void showStyleDialog() {
+        AlertDialog.Builder builder = new AlertDialog.Builder(this);
+        LinearLayout root = new LinearLayout(this);
+        root.setOrientation(LinearLayout.VERTICAL);
+        root.setPadding(40, 30, 40, 20);
+
+        TextView tvTitle = new TextView(this);
+        tvTitle.setText("阅读排版与主题");
+        tvTitle.setTextSize(16);
+        tvTitle.setTextColor(getResources().getColor(R.color.fg));
+        tvTitle.setGravity(Gravity.CENTER);
+        root.addView(tvTitle);
+
+        // 字号调整行
+        LinearLayout fontRow = new LinearLayout(this);
+        fontRow.setOrientation(LinearLayout.HORIZONTAL);
+        fontRow.setGravity(Gravity.CENTER_VERTICAL);
+        fontRow.setPadding(0, 30, 0, 20);
+
+        TextView tvFontLabel = new TextView(this);
+        tvFontLabel.setText("字号大小");
+        tvFontLabel.setTextColor(getResources().getColor(R.color.fg2));
+        tvFontLabel.setTextSize(13);
+        LinearLayout.LayoutParams lpLabel = new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f);
+        fontRow.addView(tvFontLabel, lpLabel);
+
+        Button btnDec = new Button(this);
+        btnDec.setText("A -");
+        btnDec.setBackgroundResource(R.drawable.bg_btn);
+        btnDec.setTextColor(getResources().getColor(R.color.fg));
+
+        final TextView tvSizeVal = new TextView(this);
+        tvSizeVal.setText(currentFontSize + " sp");
+        tvSizeVal.setTextColor(getResources().getColor(R.color.accent));
+        tvSizeVal.setTextSize(14);
+        tvSizeVal.setGravity(Gravity.CENTER);
+        tvSizeVal.setPadding(30, 0, 30, 0);
+
+        Button btnInc = new Button(this);
+        btnInc.setText("A +");
+        btnInc.setBackgroundResource(R.drawable.bg_btn);
+        btnInc.setTextColor(getResources().getColor(R.color.fg));
+
+        btnDec.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                applyFontSize(currentFontSize - 1);
+                tvSizeVal.setText(currentFontSize + " sp");
+            }
+        });
+        btnInc.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                applyFontSize(currentFontSize + 1);
+                tvSizeVal.setText(currentFontSize + " sp");
+            }
+        });
+
+        fontRow.addView(btnDec);
+        fontRow.addView(tvSizeVal);
+        fontRow.addView(btnInc);
+        root.addView(fontRow);
+
+        // 主题选择行
+        TextView tvThemeLabel = new TextView(this);
+        tvThemeLabel.setText("背景主题");
+        tvThemeLabel.setTextColor(getResources().getColor(R.color.fg2));
+        tvThemeLabel.setTextSize(13);
+        tvThemeLabel.setPadding(0, 10, 0, 15);
+        root.addView(tvThemeLabel);
+
+        LinearLayout themeRow = new LinearLayout(this);
+        themeRow.setOrientation(LinearLayout.HORIZONTAL);
+
+        final String[] themes = {"dark", "sepia", "sage", "oled"};
+        final String[] themeNames = {"暗夜", "羊皮纸", "豆沙绿", "极黑"};
+
+        for (int i = 0; i < themes.length; i++) {
+            final String th = themes[i];
+            Button b = new Button(this);
+            b.setText(themeNames[i]);
+            b.setTextSize(12);
+            b.setBackgroundResource(R.drawable.bg_btn);
+            b.setTextColor(getResources().getColor(R.color.fg));
+            LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(0, 100, 1f);
+            if (i > 0) lp.leftMargin = 12;
+            b.setOnClickListener(new View.OnClickListener() {
+                @Override
+                public void onClick(View v) {
+                    applyTheme(th);
+                }
+            });
+            themeRow.addView(b, lp);
+        }
+        root.addView(themeRow);
+
+        builder.setView(root);
+        builder.setPositiveButton("完成", null);
+        builder.show();
     }
 
     private static final int REQ_NOTIF = 9;
@@ -91,7 +292,6 @@ public class ReaderActivity extends Activity {
     private void onPlayClicked() {
         if (Build.VERSION.SDK_INT >= 33
                 && checkSelfPermission("android.permission.POST_NOTIFICATIONS") != PackageManager.PERMISSION_GRANTED) {
-            // 先要权限：没有通知就没法常驻前台，熄屏会被系统掐掉
             playAfterPerm = true;
             requestPermissions(new String[]{"android.permission.POST_NOTIFICATIONS"}, REQ_NOTIF);
             return;
@@ -121,14 +321,13 @@ public class ReaderActivity extends Activity {
         public void run() {
             boolean mine = TtsService.RUNNING && TtsService.BID == bid;
             if (mine && TtsService.IDX != idx) {
-                // 朗读自动跳到下一章：阅读界面跟着翻
                 idx = TtsService.IDX;
                 load();
             }
             if (mine) {
-                btnPlay.setText(TtsService.PAUSED ? "继续" : "暂停");
+                btnPlay.setText(TtsService.PAUSED ? "继续朗读" : "暂停朗读");
             } else {
-                btnPlay.setText("朗读");
+                btnPlay.setText("开始朗读");
             }
             ui.postDelayed(this, 700);
         }
@@ -142,8 +341,11 @@ public class ReaderActivity extends Activity {
     }
 
     private void load() {
-        tvChTitle.setText("第 " + (idx + 1) + " 章");
-        tvBody.setText("加载中…");
+        final String loadingCh = "第 " + (idx + 1) + " 章";
+        tvChTitle.setText(loadingCh);
+        if (tvBodyTitle != null) tvBodyTitle.setText(loadingCh);
+        tvBody.setText("加载章节中…");
+
         final int want = idx;
         pool.execute(new Runnable() {
             @Override
@@ -151,7 +353,7 @@ public class ReaderActivity extends Activity {
                 try {
                     final JSONObject r = Api.json("/api/books/" + bid + "/ch/" + want);
                     final JSONArray ps = r.optJSONArray("paras");
-                    final String t = r.optString("title");
+                    final String t = r.optString("title", loadingCh);
                     final int n = r.optInt("count", count);
                     ui.post(new Runnable() {
                         @Override
@@ -163,12 +365,24 @@ public class ReaderActivity extends Activity {
                                 for (int i = 0; i < ps.length(); i++) {
                                     String p = ps.optString(i, "").trim();
                                     if (p.isEmpty()) continue;
+                                    // 经典两空格缩进，排版舒适
+                                    if (!p.startsWith("　　") && !p.startsWith("\u3000\u3000")) {
+                                        p = "\u3000\u3000" + p;
+                                    }
                                     paras.add(p);
                                     sb.append(p).append("\n\n");
                                 }
                             }
                             tvChTitle.setText(t);
-                            tvBody.setText(sb.length() == 0 ? "（本章没有正文，可能源失效了）" : sb.toString());
+                            if (tvBodyTitle != null) tvBodyTitle.setText(t);
+                            tvBody.setText(sb.length() == 0 ? "（本章暂无正文或书源正忙，请重试或换源）" : sb.toString());
+
+                            if (tvProgressInfo != null) {
+                                int total = (count > 0 ? count : (idx + 1));
+                                int pct = Math.min(100, (idx + 1) * 100 / Math.max(1, total));
+                                tvProgressInfo.setText("第 " + (idx + 1) + " / " + total + " 章 · " + pct + "%");
+                            }
+
                             sv.scrollTo(0, 0);
                             if (pendingOff > 0) {
                                 final float f = pendingOff;

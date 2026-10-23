@@ -17,7 +17,9 @@ import android.widget.ArrayAdapter;
 import android.widget.BaseAdapter;
 import android.widget.Button;
 import android.widget.EditText;
+import android.widget.ImageView;
 import android.widget.ListView;
+import android.widget.ProgressBar;
 import android.widget.Spinner;
 import android.widget.TextView;
 import android.widget.Toast;
@@ -46,9 +48,13 @@ public class MainActivity extends Activity {
     private ListView lvShelf, lvSearch, lvSessionsHost;
     private TextView tvShelfInfo, tvShelfEmpty, tvStat, tvAccount, tvServer, tvKeyState, tvVer;
     private EditText etQ, etKey, etVoice, etSpeed;
-    private Button btnRefresh, btnSearch, btnSaveKey, btnSaveTts, btnTtsTest, btnSessions, btnLogout, btnImportSrc, btnSrcManage;
+    private View btnRefresh;
+    private Button btnSearch, btnSaveKey, btnSaveTts, btnTtsTest, btnSessions, btnLogout, btnImportSrc, btnSrcManage;
     private Spinner spProvider;
     private TextView tvKeyLabel;
+    private View layoutShelfEmpty;
+    private ImageView ivTabShelf, ivTabSearch, ivTabMe;
+    private View llTabShelf, llTabSearch, llTabMe;
     /** 和 tts.py 里的 PRESETS 对齐：顺序不能乱 */
     static final String[] PROV = {"mimo", "fish", "siliconflow", ""};
     static final String[] PROV_LABEL = {"小米 MiMo（预置/设计/克隆）", "Fish Audio（克隆音色）",
@@ -75,24 +81,31 @@ public class MainActivity extends Activity {
         lvShelf.setAdapter(shelfAdapter);
         lvSearch.setAdapter(foundAdapter);
 
-        tabShelf.setOnClickListener(new View.OnClickListener() {
+        View.OnClickListener clickShelf = new View.OnClickListener() {
             @Override
             public void onClick(View v) {
                 showPanel(0);
             }
-        });
-        tabSearch.setOnClickListener(new View.OnClickListener() {
+        };
+        View.OnClickListener clickSearch = new View.OnClickListener() {
             @Override
             public void onClick(View v) {
                 showPanel(1);
             }
-        });
-        tabMe.setOnClickListener(new View.OnClickListener() {
+        };
+        View.OnClickListener clickMe = new View.OnClickListener() {
             @Override
             public void onClick(View v) {
                 showPanel(2);
             }
-        });
+        };
+
+        tabShelf.setOnClickListener(clickShelf);
+        if (llTabShelf != null) llTabShelf.setOnClickListener(clickShelf);
+        tabSearch.setOnClickListener(clickSearch);
+        if (llTabSearch != null) llTabSearch.setOnClickListener(clickSearch);
+        tabMe.setOnClickListener(clickMe);
+        if (llTabMe != null) llTabMe.setOnClickListener(clickMe);
 
         btnRefresh.setOnClickListener(new View.OnClickListener() {
             @Override
@@ -110,7 +123,7 @@ public class MainActivity extends Activity {
         lvShelf.setOnItemLongClickListener(new AdapterView.OnItemLongClickListener() {
             @Override
             public boolean onItemLongClick(AdapterView<?> p, View v, final int pos, long id) {
-                confirmDelete(shelf.get(pos));
+                showBookMenu(shelf.get(pos));
                 return true;
             }
         });
@@ -203,6 +216,22 @@ public class MainActivity extends Activity {
         lvSearch = findViewById(R.id.lvSearch);
         tvShelfInfo = findViewById(R.id.tvShelfInfo);
         tvShelfEmpty = findViewById(R.id.tvShelfEmpty);
+        layoutShelfEmpty = findViewById(R.id.layoutShelfEmpty);
+        View btnEmptySearch = findViewById(R.id.btnEmptySearch);
+        if (btnEmptySearch != null) {
+            btnEmptySearch.setOnClickListener(new View.OnClickListener() {
+                @Override
+                public void onClick(View v) {
+                    showPanel(1);
+                }
+            });
+        }
+        ivTabShelf = findViewById(R.id.ivTabShelf);
+        ivTabSearch = findViewById(R.id.ivTabSearch);
+        ivTabMe = findViewById(R.id.ivTabMe);
+        llTabShelf = findViewById(R.id.llTabShelf);
+        llTabSearch = findViewById(R.id.llTabSearch);
+        llTabMe = findViewById(R.id.llTabMe);
         tvStat = findViewById(R.id.tvStat);
         tvAccount = findViewById(R.id.tvAccount);
         tvServer = findViewById(R.id.tvServer);
@@ -230,10 +259,13 @@ public class MainActivity extends Activity {
         panelSearch.setVisibility(i == 1 ? View.VISIBLE : View.GONE);
         panelMe.setVisibility(i == 2 ? View.VISIBLE : View.GONE);
         int on = getResources().getColor(R.color.accent);
-        int off = getResources().getColor(R.color.fg2);
+        int off = getResources().getColor(R.color.fg3);
         tabShelf.setTextColor(i == 0 ? on : off);
         tabSearch.setTextColor(i == 1 ? on : off);
         tabMe.setTextColor(i == 2 ? on : off);
+        if (ivTabShelf != null) ivTabShelf.setColorFilter(i == 0 ? on : off);
+        if (ivTabSearch != null) ivTabSearch.setColorFilter(i == 1 ? on : off);
+        if (ivTabMe != null) ivTabMe.setColorFilter(i == 2 ? on : off);
         if (i == 1) loadSearchMeta();
         if (i == 2) loadMe();
     }
@@ -286,7 +318,11 @@ public class MainActivity extends Activity {
                             }
                             shelfAdapter.notifyDataSetChanged();
                             tvShelfInfo.setText(shelf.size() + " 本");
-                            tvShelfEmpty.setVisibility(shelf.isEmpty() ? View.VISIBLE : View.GONE);
+                            boolean empty = shelf.isEmpty();
+                            tvShelfEmpty.setVisibility(empty ? View.VISIBLE : View.GONE);
+                            if (layoutShelfEmpty != null) {
+                                layoutShelfEmpty.setVisibility(empty ? View.VISIBLE : View.GONE);
+                            }
                         }
                     });
                 } catch (final Exception e) {
@@ -306,12 +342,45 @@ public class MainActivity extends Activity {
     }
 
     private void openBook(JSONObject book) {
+        Intent i = new Intent(this, ReaderActivity.class);
+        i.putExtra("bid", book.optInt("id"));
+        i.putExtra("idx", book.optInt("progress_ch"));
+        i.putExtra("off", (float) book.optDouble("progress_off", -1.0));
+        i.putExtra("title", book.optString("title"));
+        i.putExtra("count", book.optInt("ch_count"));
+        startActivity(i);
+    }
+
+    private void openBookToc(JSONObject book) {
         Intent i = new Intent(this, TocActivity.class);
         i.putExtra("bid", book.optInt("id"));
         i.putExtra("title", book.optString("title"));
         i.putExtra("count", book.optInt("ch_count"));
         i.putExtra("cur", book.optInt("progress_ch"));
         startActivity(i);
+    }
+
+    private void showBookMenu(final JSONObject book) {
+        final String[] options = {"继续阅读", "查看目录", "换源搜索", "移出书架"};
+        new AlertDialog.Builder(this)
+                .setTitle("《" + book.optString("title") + "》")
+                .setItems(options, new DialogInterface.OnClickListener() {
+                    @Override
+                    public void onClick(DialogInterface dialog, int which) {
+                        if (which == 0) {
+                            openBook(book);
+                        } else if (which == 1) {
+                            openBookToc(book);
+                        } else if (which == 2) {
+                            showPanel(1);
+                            etQ.setText(book.optString("title"));
+                            doSearch();
+                        } else if (which == 3) {
+                            confirmDelete(book);
+                        }
+                    }
+                })
+                .show();
     }
 
     private void confirmDelete(final JSONObject book) {
@@ -927,30 +996,107 @@ public class MainActivity extends Activity {
                         searchMode ? R.layout.item_search : R.layout.item_book, parent, false);
             }
             JSONObject o = searchMode ? found.get(i) : shelf.get(i);
+            int[] covers = {
+                R.drawable.bg_book_cover_1,
+                R.drawable.bg_book_cover_2,
+                R.drawable.bg_book_cover_3,
+                R.drawable.bg_book_cover_4
+            };
             if (searchMode) {
-                ((TextView) v.findViewById(R.id.tvSTitle)).setText(o.optString("name"));
-                String author = o.optString("author");
-                ((TextView) v.findViewById(R.id.tvSMeta)).setText(
-                        (TextUtils.isEmpty(author) ? "佚名" : author) + " · " + o.optString("_source"));
-                TextView hit = v.findViewById(R.id.tvSHit);
+                String name = o.optString("name", "");
+                String author = o.optString("author", "");
+                String src = o.optString("_source", "");
                 String m = o.optString("matched", "");
-                if (m.isEmpty() || "name".equals(m)) {
-                    hit.setText("");
-                } else {
-                    hit.setText("author".equals(m) ? "作者命中" : m);
+
+                View flCover = v.findViewById(R.id.flSCover);
+                if (flCover != null) {
+                    flCover.setBackgroundResource(covers[Math.abs(name.hashCode()) % covers.length]);
+                }
+                TextView tvCoverTitle = v.findViewById(R.id.tvSCoverTitle);
+                if (tvCoverTitle != null) {
+                    tvCoverTitle.setText(name);
+                }
+
+                TextView tvSTitle = v.findViewById(R.id.tvSTitle);
+                if (tvSTitle != null) tvSTitle.setText(name);
+
+                TextView tvSMeta = v.findViewById(R.id.tvSMeta);
+                if (tvSMeta != null) {
+                    String meta = (TextUtils.isEmpty(author) ? "佚名" : author) + " · 来源: " + src;
+                    String latest = o.optString("latest", "");
+                    if (!TextUtils.isEmpty(latest)) {
+                        meta += "\n最新: " + latest;
+                    }
+                    tvSMeta.setText(meta);
+                }
+
+                TextView hit = v.findViewById(R.id.tvSHit);
+                if (hit != null) {
+                    if (m.isEmpty() || "name".equals(m)) {
+                        hit.setText("精准匹配");
+                    } else if ("author".equals(m)) {
+                        hit.setText("作者命中");
+                    } else {
+                        hit.setText(m);
+                    }
                 }
             } else {
-                ((TextView) v.findViewById(R.id.tvBTitle)).setText(o.optString("title"));
-                StringBuilder sb = new StringBuilder();
-                String author = o.optString("author");
-                sb.append(TextUtils.isEmpty(author) ? "佚名" : author);
-                int n = o.optInt("ch_count");
-                sb.append(" · ").append(n).append(" 章");
-                int pg = o.optInt("progress_ch");
-                if (pg > 0) sb.append(" · 读到第 ").append(pg + 1).append(" 章");
+                String title = o.optString("title", "");
+                String author = o.optString("author", "");
+                int n = o.optInt("ch_count", 0);
+                int pg = o.optInt("progress_ch", 0);
                 String src = o.optString("src_name", "");
-                if (!TextUtils.isEmpty(src)) sb.append(" · ").append(src);
-                ((TextView) v.findViewById(R.id.tvBMeta)).setText(sb.toString());
+
+                View flCover = v.findViewById(R.id.flCover);
+                if (flCover != null) {
+                    flCover.setBackgroundResource(covers[Math.abs(title.hashCode()) % covers.length]);
+                }
+                TextView tvCoverTitle = v.findViewById(R.id.tvCoverTitle);
+                if (tvCoverTitle != null) {
+                    tvCoverTitle.setText(title);
+                }
+
+                TextView tvBTitle = v.findViewById(R.id.tvBTitle);
+                if (tvBTitle != null) tvBTitle.setText(title);
+
+                TextView tvBMeta = v.findViewById(R.id.tvBMeta);
+                if (tvBMeta != null) {
+                    StringBuilder sb = new StringBuilder();
+                    sb.append(TextUtils.isEmpty(author) ? "佚名" : author);
+                    if (!TextUtils.isEmpty(src)) sb.append(" · ").append(src);
+                    sb.append(" · ").append(n).append(" 章");
+                    tvBMeta.setText(sb.toString());
+                }
+
+                int percent = (n > 0) ? Math.min(100, Math.max(0, (pg + 1) * 100 / n)) : 0;
+
+                TextView tvBTag = v.findViewById(R.id.tvBTag);
+                if (tvBTag != null) {
+                    if (n > 0 && pg > 0) {
+                        tvBTag.setText("已读 " + percent + "%");
+                        tvBTag.setTextColor(getResources().getColor(R.color.accent));
+                        tvBTag.setBackgroundResource(R.drawable.bg_tag_accent);
+                    } else {
+                        tvBTag.setText("未读");
+                        tvBTag.setTextColor(getResources().getColor(R.color.fg3));
+                        tvBTag.setBackgroundResource(R.drawable.bg_tag);
+                    }
+                }
+
+                TextView tvBProgress = v.findViewById(R.id.tvBProgress);
+                if (tvBProgress != null) {
+                    if (pg > 0) {
+                        String lastCh = o.optString("last_chapter", "");
+                        tvBProgress.setText("读到第 " + (pg + 1) + " 章" + (lastCh.isEmpty() ? "" : " · " + lastCh));
+                    } else {
+                        tvBProgress.setText("尚未开始阅读");
+                    }
+                }
+
+                ProgressBar pbBook = v.findViewById(R.id.pbBook);
+                if (pbBook != null) {
+                    pbBook.setProgress(percent);
+                }
             }
             return v;
         }

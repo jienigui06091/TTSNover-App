@@ -1,45 +1,187 @@
 <?xml version="1.0" encoding="utf-8"?>
-<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
-    android:layout_width="match_parent" android:layout_height="match_parent"
-    android:orientation="vertical" android:background="@color/bg">
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/rootReader"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@color/read_dark_bg">
 
-    <LinearLayout android:layout_width="match_parent" android:layout_height="52dp"
-        android:orientation="horizontal" android:gravity="center_vertical"
-        android:paddingLeft="14dp" android:paddingRight="6dp"
-        android:background="@color/bg2">
-        <TextView android:id="@+id/tvChTitle" android:layout_width="0dp"
-            android:layout_weight="1" android:layout_height="wrap_content"
-            android:textColor="@color/fg" android:textSize="14sp"
-            android:maxLines="1" android:ellipsize="end" />
-        <Button android:id="@+id/btnToc" style="@style/Btn"
-            android:layout_width="wrap_content" android:layout_height="36dp"
-            android:minHeight="0dp" android:textSize="12sp" android:text="目录" />
-    </LinearLayout>
+    <!-- 主阅读滚动区域 -->
+    <ScrollView
+        android:id="@+id/svBody"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:fillViewport="true"
+        android:scrollbars="none">
 
-    <ScrollView android:id="@+id/svBody" android:layout_width="match_parent"
-        android:layout_height="0dp" android:layout_weight="1" android:padding="18dp">
-        <TextView android:id="@+id/tvBody" android:layout_width="match_parent"
-            android:layout_height="wrap_content" android:textColor="@color/fg"
-            android:textSize="18sp" android:lineSpacingExtra="8dp" android:textIsSelectable="true" />
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:paddingLeft="22dp"
+            android:paddingRight="22dp"
+            android:paddingTop="70dp"
+            android:paddingBottom="120dp">
+
+            <!-- 章节大标题 -->
+            <TextView
+                android:id="@+id/tvBodyTitle"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:textColor="@color/read_dark_fg"
+                android:textSize="22sp"
+                android:textStyle="bold"
+                android:layout_marginBottom="24dp" />
+
+            <!-- 正文内容 -->
+            <TextView
+                android:id="@+id/tvBody"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:textColor="@color/read_dark_fg"
+                android:textSize="18sp"
+                android:lineSpacingMultiplier="1.45"
+                android:textIsSelectable="true" />
+        </LinearLayout>
     </ScrollView>
 
-    <View android:layout_width="match_parent" android:layout_height="1dp"
-        android:background="@color/line" />
-    <LinearLayout android:layout_width="match_parent" android:layout_height="56dp"
-        android:orientation="horizontal" android:gravity="center_vertical"
-        android:paddingLeft="8dp" android:paddingRight="8dp" android:background="@color/bg2">
-        <Button android:id="@+id/btnPrev" style="@style/Btn"
-            android:layout_width="0dp" android:layout_weight="1"
-            android:layout_height="42dp" android:minHeight="0dp"
-            android:textSize="13sp" android:text="上一章" />
-        <Button android:id="@+id/btnPlay" style="@style/BtnPrimary"
-            android:layout_width="0dp" android:layout_weight="1"
-            android:layout_height="42dp" android:minHeight="0dp"
-            android:layout_marginLeft="8dp" android:layout_marginRight="8dp"
-            android:textSize="13sp" android:text="朗读" />
-        <Button android:id="@+id/btnNext" style="@style/Btn"
-            android:layout_width="0dp" android:layout_weight="1"
-            android:layout_height="42dp" android:minHeight="0dp"
-            android:textSize="13sp" android:text="下一章" />
+    <!-- 顶部悬浮控制栏 -->
+    <LinearLayout
+        android:id="@+id/layoutTopHud"
+        android:layout_width="match_parent"
+        android:layout_height="56dp"
+        android:layout_gravity="top"
+        android:orientation="horizontal"
+        android:gravity="center_vertical"
+        android:paddingLeft="12dp"
+        android:paddingRight="12dp"
+        android:background="@drawable/bg_hud_top">
+
+        <ImageButton
+            android:id="@+id/btnBack"
+            android:layout_width="40dp"
+            android:layout_height="40dp"
+            android:background="?android:attr/selectableItemBackgroundBorderless"
+            android:src="@drawable/ic_back"
+            android:tint="@color/fg"
+            android:contentDescription="返回" />
+
+        <LinearLayout
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:orientation="vertical"
+            android:layout_marginLeft="6dp"
+            android:layout_marginRight="6dp">
+
+            <TextView
+                android:id="@+id/tvChTitle"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:textColor="@color/fg"
+                android:textSize="14sp"
+                android:textStyle="bold"
+                android:maxLines="1"
+                android:ellipsize="end" />
+
+            <TextView
+                android:id="@+id/tvBookSubtitle"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:textColor="@color/fg3"
+                android:textSize="11sp"
+                android:maxLines="1"
+                android:ellipsize="end" />
+        </LinearLayout>
+
+        <ImageButton
+            android:id="@+id/btnStyle"
+            android:layout_width="40dp"
+            android:layout_height="40dp"
+            android:background="?android:attr/selectableItemBackgroundBorderless"
+            android:src="@drawable/ic_palette"
+            android:tint="@color/fg"
+            android:contentDescription="阅读外观" />
+
+        <Button
+            android:id="@+id/btnToc"
+            style="@style/BtnGhost"
+            android:layout_width="wrap_content"
+            android:layout_height="36dp"
+            android:minHeight="0dp"
+            android:textSize="12sp"
+            android:paddingLeft="12dp"
+            android:paddingRight="12dp"
+            android:layout_marginLeft="4dp"
+            android:text="目录" />
     </LinearLayout>
-</LinearLayout>
+
+    <!-- 底部悬浮控制 Dock -->
+    <LinearLayout
+        android:id="@+id/layoutBottomHud"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_gravity="bottom"
+        android:orientation="vertical"
+        android:paddingLeft="16dp"
+        android:paddingRight="16dp"
+        android:paddingBottom="16dp">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:background="@drawable/bg_hud"
+            android:padding="12dp">
+
+            <!-- 章节进度指示 -->
+            <TextView
+                android:id="@+id/tvProgressInfo"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:textColor="@color/fg2"
+                android:textSize="11sp"
+                android:gravity="center"
+                android:layout_marginBottom="8dp" />
+
+            <!-- 控制按钮组 -->
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="46dp"
+                android:orientation="horizontal"
+                android:gravity="center_vertical">
+
+                <Button
+                    android:id="@+id/btnPrev"
+                    style="@style/Btn"
+                    android:layout_width="0dp"
+                    android:layout_weight="1"
+                    android:layout_height="42dp"
+                    android:minHeight="0dp"
+                    android:textSize="13sp"
+                    android:text="上一章" />
+
+                <Button
+                    android:id="@+id/btnPlay"
+                    style="@style/BtnPrimary"
+                    android:layout_width="0dp"
+                    android:layout_weight="1.3"
+                    android:layout_height="42dp"
+                    android:minHeight="0dp"
+                    android:layout_marginLeft="10dp"
+                    android:layout_marginRight="10dp"
+                    android:textSize="14sp"
+                    android:text="朗读" />
+
+                <Button
+                    android:id="@+id/btnNext"
+                    style="@style/Btn"
+                    android:layout_width="0dp"
+                    android:layout_weight="1"
+                    android:layout_height="42dp"
+                    android:minHeight="0dp"
+                    android:textSize="13sp"
+                    android:text="下一章" />
+            </LinearLayout>
+        </LinearLayout>
+    </LinearLayout>
+</FrameLayout>

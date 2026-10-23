@@ -1,11 +1,104 @@
 <?xml version="1.0" encoding="utf-8"?>
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
-    android:layout_width="match_parent" android:layout_height="wrap_content"
-    android:orientation="vertical" android:background="@drawable/bg_card" android:padding="14dp">
-    <TextView android:id="@+id/tvBTitle" android:layout_width="match_parent"
-        android:layout_height="wrap_content" android:textColor="@color/fg"
-        android:textSize="16sp" android:maxLines="1" android:ellipsize="end" />
-    <TextView android:id="@+id/tvBMeta" android:layout_width="match_parent"
-        android:layout_height="wrap_content" android:textColor="@color/fg2"
-        android:textSize="12sp" android:layout_marginTop="5dp" />
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="horizontal"
+    android:background="@drawable/bg_card_interactive"
+    android:padding="12dp"
+    android:gravity="center_vertical">
+
+    <!-- 模拟精美书封 -->
+    <FrameLayout
+        android:id="@+id/flCover"
+        android:layout_width="54dp"
+        android:layout_height="74dp"
+        android:background="@drawable/bg_book_cover_1"
+        android:padding="6dp">
+
+        <TextView
+            android:id="@+id/tvCoverTitle"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_gravity="top|left"
+            android:textColor="#FFFFFF"
+            android:textSize="11sp"
+            android:textStyle="bold"
+            android:maxLines="3"
+            android:ellipsize="end"
+            android:lineSpacingExtra="1dp" />
+    </FrameLayout>
+
+    <!-- 右侧书籍详细信息 -->
+    <LinearLayout
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_weight="1"
+        android:orientation="vertical"
+        android:layout_marginLeft="14dp">
+
+        <!-- 书名与进度徽章 -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:gravity="center_vertical">
+
+            <TextView
+                android:id="@+id/tvBTitle"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:textColor="@color/fg"
+                android:textSize="16sp"
+                android:textStyle="bold"
+                android:maxLines="1"
+                android:ellipsize="end" />
+
+            <TextView
+                android:id="@+id/tvBTag"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:background="@drawable/bg_tag_accent"
+                android:textColor="@color/accent"
+                android:textSize="11sp"
+                android:paddingLeft="6dp"
+                android:paddingRight="6dp"
+                android:paddingTop="2dp"
+                android:paddingBottom="2dp"
+                android:layout_marginLeft="8dp" />
+        </LinearLayout>
+
+        <!-- 作者与源 -->
+        <TextView
+            android:id="@+id/tvBMeta"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:textColor="@color/fg2"
+            android:textSize="12sp"
+            android:layout_marginTop="4dp"
+            android:maxLines="1"
+            android:ellipsize="end" />
+
+        <!-- 阅读进度与最新章节提示 -->
+        <TextView
+            android:id="@+id/tvBProgress"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:textColor="@color/fg3"
+            android:textSize="11sp"
+            android:layout_marginTop="4dp"
+            android:maxLines="1"
+            android:ellipsize="end" />
+
+        <!-- 极细阅读进度条 -->
+        <ProgressBar
+            android:id="@+id/pbBook"
+            style="?android:attr/progressBarStyleHorizontal"
+            android:layout_width="match_parent"
+            android:layout_height="3dp"
+            android:layout_marginTop="6dp"
+            android:max="100"
+            android:progress="0"
+            android:progressDrawable="@drawable/progress_book" />
+    </LinearLayout>
 </LinearLayout>
