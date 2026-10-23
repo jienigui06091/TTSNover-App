@@ -10,7 +10,10 @@ import android.os.Build;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
+import android.text.SpannableString;
+import android.text.style.BackgroundColorSpan;
 import android.view.Gravity;
+import android.view.MotionEvent;
 import android.view.View;
 import android.widget.Button;
 import android.widget.ImageButton;
@@ -47,6 +50,9 @@ public class ReaderActivity extends Activity {
     private boolean hudVisible = true;
     private int currentFontSize = 18;
     private String currentTheme = "dark";
+    private String bodyRaw = "";
+    private String lastHighlighted = "";
+    private int lastTouchedOffset = 0;
 
     @Override
     protected void onCreate(Bundle b) {
@@ -139,7 +145,38 @@ public class ReaderActivity extends Activity {
             }
         };
         tvBody.setOnClickListener(toggleListener);
+        tvBody.setOnTouchListener(new View.OnTouchListener() {
+            @Override
+            public boolean onTouch(View v, MotionEvent e) {
+                if (e.getAction() == MotionEvent.ACTION_UP) {
+                    try {
+                        TextView x = (TextView) v;
+                        int line = x.getLayout().getLineForVertical((int) e.getY() - x.getTotalPaddingTop() + x.getScrollY());
+                        lastTouchedOffset = x.getLayout().getOffsetForHorizontal(line, e.getX() - x.getTotalPaddingLeft());
+                    } catch (Exception ignored) { }
+                }
+                return false;
+            }
+        });
+        tvBody.setOnLongClickListener(new View.OnLongClickListener() {
+            @Override
+            public boolean onLongClick(View v) {
+                startReadingFromTouchedLine();
+                return true;
+            }
+        });
         sv.setOnClickListener(toggleListener);
+        sv.setOnTouchListener(new View.OnTouchListener() {
+            @Override
+            public boolean onTouch(View v, MotionEvent e) {
+                if (e.getAction() == MotionEvent.ACTION_UP && !TtsService.RUNNING) {
+                    v.postDelayed(new Runnable() {
+                        @Override public void run() { openNextChapterAtBottom(); }
+                    }, 80);
+                }
+                return false;
+            }
+        });
 
         load();
         ui.postDelayed(tick, 600);
@@ -316,6 +353,34 @@ public class ReaderActivity extends Activity {
         }
     }
 
+    /** 长按正文任一行，明确从这一行开始朗读。 */
+    private void startReadingFromTouchedLine() {
+        String picked = lineAt(lastTouchedOffset);
+        if (picked.isEmpty()) {
+            Toast.makeText(this, "请先点在正文某一行上", Toast.LENGTH_SHORT).show();
+            return;
+        }
+        final String from = picked;
+        new AlertDialog.Builder(this)
+                .setTitle("从这里开始朗读")
+                .setMessage(from.length() > 80 ? from.substring(0, 80) + "…" : from)
+                .setNegativeButton("取消", null)
+                .setPositiveButton("从这一行开始读", new android.content.DialogInterface.OnClickListener() {
+                    @Override public void onClick(android.content.DialogInterface d, int which) {
+                        TtsService.start(ReaderActivity.this, bid, idx, bookTitle, count, from);
+                    }
+                }).show();
+    }
+
+    private String lineAt(int offset) {
+        if (bodyRaw == null || bodyRaw.isEmpty()) return "";
+        int at = Math.max(0, Math.min(offset, bodyRaw.length() - 1));
+        int start = bodyRaw.lastIndexOf("\n", at);
+        int end = bodyRaw.indexOf("\n", at);
+        String line = bodyRaw.substring(start < 0 ? 0 : start + 1, end < 0 ? bodyRaw.length() : end).trim();
+        return line.replaceFirst("^[　\\s]+", "");
+    }
+
     private final Runnable tick = new Runnable() {
         @Override
         public void run() {
@@ -326,12 +391,50 @@ public class ReaderActivity extends Activity {
             }
             if (mine) {
                 btnPlay.setText(TtsService.PAUSED ? "继续朗读" : "暂停朗读");
+                highlightSpeaking(TtsService.CURRENT_CHUNK);
             } else {
                 btnPlay.setText("开始朗读");
+                if (!lastHighlighted.isEmpty()) highlightSpeaking("");
             }
             ui.postDelayed(this, 700);
         }
     };
+
+    private void highlightSpeaking(String spoken) {
+        if (spoken == null) spoken = "";
+        if (spoken.equals(lastHighlighted)) return;
+        lastHighlighted = spoken;
+        SpannableString styled = new SpannableString(bodyRaw == null ? "" : bodyRaw);
+        if (!spoken.isEmpty()) {
+            String key = spoken.trim();
+            int start = bodyRaw.indexOf(key);
+            if (start < 0 && key.length() > 18) start = bodyRaw.indexOf(key.substring(0, 18));
+            if (start >= 0) {
+                int end = Math.min(bodyRaw.length(), start + key.length());
+                styled.setSpan(new BackgroundColorSpan(getResources().getColor(R.color.accent)), start, end, 33);
+                final int at = start;
+                tvBody.setText(styled);
+                ui.postDelayed(new Runnable() {
+                    @Override public void run() {
+                        try {
+                            int y = tvBody.getLayout().getLineTop(tvBody.getLayout().getLineForOffset(at));
+                            sv.smoothScrollTo(0, Math.max(0, y - sv.getHeight() / 3));
+                        } catch (Exception ignored) { }
+                    }
+                }, 40);
+                return;
+            }
+        }
+        tvBody.setText(styled);
+    }
+
+    private void openNextChapterAtBottom() {
+        View child = sv.getChildAt(0);
+        if (child == null || count <= 0 || idx + 1 >= count) return;
+        if (sv.getScrollY() + sv.getHeight() >= child.getHeight() - 24) {
+            go(idx + 1);
+        }
+    }
 
     private void go(int i) {
         if (i < 0 || (count > 0 && i >= count)) return;
@@ -375,7 +478,9 @@ public class ReaderActivity extends Activity {
                             }
                             tvChTitle.setText(t);
                             if (tvBodyTitle != null) tvBodyTitle.setText(t);
-                            tvBody.setText(sb.length() == 0 ? "（本章暂无正文或书源正忙，请重试或换源）" : sb.toString());
+                            bodyRaw = sb.length() == 0 ? "（本章暂无正文或书源正忙，请重试或换源）" : sb.toString();
+                            lastHighlighted = "";
+                            tvBody.setText(bodyRaw);
 
                             if (tvProgressInfo != null) {
                                 int total = (count > 0 ? count : (idx + 1));

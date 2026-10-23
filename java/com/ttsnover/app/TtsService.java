@@ -51,6 +51,8 @@ public class TtsService extends Service {
     public static volatile boolean PAUSED = false;
     public static volatile int BID = -1;
     public static volatile int IDX = -1;
+    /** 当前正在合成/播放的文本块，供阅读页定位和高亮；空串表示未朗读。 */
+    public static volatile String CURRENT_CHUNK = "";
 
     private final Object lock = new Object();
     private final ExecutorService synthPool = Executors.newSingleThreadExecutor();
@@ -68,18 +70,26 @@ public class TtsService extends Service {
     private String chTitle = "";
     private List<String> chunks = new ArrayList<String>();
     private int pos = 0;
+    /** 仅本次启动的第一章生效，随后章节自然从头连续朗读。 */
+    private String startFrom = "";
     private Future<byte[]> prefetched;
     private String prefetchedFor = "";
 
     // ---------------- 静态入口 ----------------
 
     public static void start(Context c, int bid, int idx, String title, int count) {
+        start(c, bid, idx, title, count, "");
+    }
+
+    /** 从当前章节中包含 startFrom 的文本块起朗读；空字符串代表整章开头。 */
+    public static void start(Context c, int bid, int idx, String title, int count, String startFrom) {
         Intent i = new Intent(c, TtsService.class);
         i.setAction(A_START);
         i.putExtra("bid", bid);
         i.putExtra("idx", idx);
         i.putExtra("title", title);
         i.putExtra("count", count);
+        i.putExtra("startFrom", startFrom == null ? "" : startFrom);
         go(c, i);
     }
 
@@ -182,6 +192,7 @@ public class TtsService extends Service {
         count = it.getIntExtra("count", count);
         String t = it.getStringExtra("title");
         if (t != null && !t.isEmpty()) bookTitle = t;
+        String requestedStart = it.getStringExtra("startFrom");
 
         ensureChannel();
         startFg();
@@ -194,6 +205,8 @@ public class TtsService extends Service {
             IDX = idx;
             PAUSED = false;
             paused = false;
+            startFrom = requestedStart == null ? "" : requestedStart.trim();
+            CURRENT_CHUNK = "";
             wakelock.acquire(4 * 60 * 60 * 1000L);
             worker = new Thread(new Runnable() {
                 @Override
@@ -204,6 +217,8 @@ public class TtsService extends Service {
             worker.start();
         } else {
             BID = bid;
+            startFrom = requestedStart == null ? "" : requestedStart.trim();
+            CURRENT_CHUNK = "";
             jumpTo(idx);
         }
         updateNotification();
@@ -244,6 +259,7 @@ public class TtsService extends Service {
                 if (!alive) break;
                 if (!waitIfPaused()) break;
                 String text = chunks.get(pos);
+                CURRENT_CHUNK = text;
                 byte[] audio;
                 try {
                     audio = takeAudio(text);
@@ -327,6 +343,11 @@ public class TtsService extends Service {
                 }
             }
             List<String> c = Chunker.split(list);
+            // A line selected in the reader starts from the chunk that contains it.
+            if (!startFrom.isEmpty()) {
+                c = cutFrom(c, startFrom);
+                startFrom = "";
+            }
             if (c.isEmpty()) return false;
             chunks = c;
             pos = 0;
@@ -342,6 +363,19 @@ public class TtsService extends Service {
             Log.w(TAG, "load chapter " + want + " failed: " + e);
             return false;
         }
+    }
+
+    /** 删除点选行前的语块；找不到时稳妥地从本章开头开始。 */
+    static List<String> cutFrom(List<String> chunks, String startFrom) {
+        if (chunks == null || chunks.isEmpty() || startFrom == null || startFrom.trim().isEmpty()) return chunks;
+        String key = startFrom.trim();
+        for (int i = 0; i < chunks.size(); i++) {
+            String c = chunks.get(i);
+            if (c.contains(key) || key.contains(c)) {
+                return new ArrayList<String>(chunks.subList(i, chunks.size()));
+            }
+        }
+        return chunks;
     }
 
     private boolean playBlocking(byte[] audio) {
@@ -596,6 +630,7 @@ public class TtsService extends Service {
         alive = false;
         RUNNING = false;
         PAUSED = false;
+        CURRENT_CHUNK = "";
         paused = false;
         synchronized (lock) {
             if (player != null) {
