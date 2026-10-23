@@ -102,6 +102,8 @@ public class Api {
             String p = path == null ? "" : path;
             if (p.startsWith("/api/books")) return booksRoute(method, p, body);
             if (p.startsWith("/api/src/search")) return search(qs(p, "q"));
+            // Preview is deliberately read-only: search / detail / preview never writes a book.
+            if (p.startsWith("/api/src/preview")) return previewBook(body);
             if (p.startsWith("/api/src/add")) return addBook(body);
             if (p.startsWith("/api/sources/export")) {
                 return new JSONObject().put("sources", new JSONArray(db().exportSources()))
@@ -196,6 +198,38 @@ public class Api {
         }
         return new JSONObject().put("title", name).put("paras", paras)
                 .put("count", paras.length()).put("idx", idx);
+    }
+
+    /** 搜索详情的试读：只解析第一章正文，绝不写入 books/chapters 表。 */
+    static JSONObject previewBook(JSONObject body) throws Exception {
+        if (body == null) throw new Err(400, "缺参数");
+        String sid = body.optString("sid", "");
+        JSONObject bk = body.optJSONObject("book");
+        if (bk == null) bk = new JSONObject();
+        JSONObject src = db().sourceByUrl(sid);
+        if (src == null) throw new Err(404, "书源不存在（可能刚被删了）");
+        String bookUrl = bk.optString("url", bk.optString("bookUrl", "")).trim();
+        if (bookUrl.isEmpty()) throw new Err(400, "缺书籍链接");
+
+        JSONObject info = new JSONObject();
+        try { info = RuleEngine.info(src, bookUrl); } catch (Throwable ignored) { }
+        String tocUrl = info.optString("tocUrl", bookUrl);
+        List<JSONObject> toc = RuleEngine.toc(src, tocUrl);
+        if (toc.isEmpty() && !bookUrl.equals(tocUrl)) toc = RuleEngine.toc(src, bookUrl);
+        if (toc.isEmpty()) throw new Err(0, "目录是空的：源可能改版或需要 JS 规则");
+        JSONObject first = toc.get(0);
+        JSONObject chapter = RuleEngine.content(src, first.optString("url", ""));
+        String content = chapter.optString("content", "").trim();
+        if (content.isEmpty()) throw new Err(0, "第一章没有抓到正文（源可能改版）");
+        JSONArray paras = new JSONArray();
+        for (String line : content.split("\\n")) {
+            String s = line.trim();
+            if (!s.isEmpty()) paras.put(s);
+        }
+        return new JSONObject()
+                .put("title", chapter.optString("title", first.optString("name", bk.optString("name", ""))))
+                .put("paras", paras).put("count", paras.length())
+                .put("chapters", toc.size()).put("preview", true);
     }
 
     static JSONObject addBook(JSONObject body) throws Exception {

@@ -814,6 +814,60 @@ public class MainActivity extends Activity {
         });
     }
 
+    private void previewBook(final JSONObject bk) {
+        final String name = bk.optString("name", "这本书");
+        Toast.makeText(this, "正在加载《" + name + "》第一章…", Toast.LENGTH_SHORT).show();
+        pool.execute(new Runnable() {
+            @Override
+            public void run() {
+                try {
+                    JSONObject body = new JSONObject();
+                    String sid = bk.optString("_sid", bk.optString("sid", ""));
+                    body.put("sid", sid).put("book", bk);
+                    final JSONObject r = Api.post("/api/src/preview", body);
+                    ui.post(new Runnable() {
+                        @Override
+                        public void run() {
+                            String title = r.optString("title", name);
+                            JSONArray paras = r.optJSONArray("paras");
+                            StringBuilder text = new StringBuilder();
+                            if (paras != null) {
+                                for (int i = 0; i < paras.length(); i++) {
+                                    if (i > 0) text.append("\n\n");
+                                    text.append(paras.optString(i));
+                                }
+                            }
+                            showPreviewDialog(name, title, text.toString(), r.optInt("chapters"));
+                        }
+                    });
+                } catch (final Exception e) {
+                    ui.post(new Runnable() {
+                        @Override
+                        public void run() {
+                            Toast.makeText(MainActivity.this, "试读失败：" + Api.errText(e), Toast.LENGTH_LONG).show();
+                        }
+                    });
+                }
+            }
+        });
+    }
+
+    private void showPreviewDialog(String book, String chapter, String text, int chapters) {
+        ScrollView scroll = new ScrollView(this);
+        TextView body = new TextView(this);
+        body.setText((TextUtils.isEmpty(chapter) ? "第一章" : chapter) + "\n\n" + text);
+        body.setTextSize(16);
+        body.setTextColor(getResources().getColor(R.color.fg));
+        body.setLineSpacing(8, 1.25f);
+        body.setPadding(36, 24, 36, 24);
+        scroll.addView(body);
+        new AlertDialog.Builder(this)
+                .setTitle("《" + book + "》 · 试读" + (chapters > 0 ? "（共 " + chapters + " 章）" : ""))
+                .setView(scroll)
+                .setPositiveButton("关闭", null)
+                .show();
+    }
+
     private void showBookDetailsDialog(final JSONObject bk) {
         final String name = bk.optString("name");
         final String author = bk.optString("author");
@@ -854,10 +908,10 @@ public class MainActivity extends Activity {
                     manualAddBook(bk, null, false);
                 }
             });
-            b.setNeutralButton("试读全书", new DialogInterface.OnClickListener() {
+            b.setNeutralButton("试读第一章", new DialogInterface.OnClickListener() {
                 @Override
                 public void onClick(DialogInterface dialog, int which) {
-                    manualAddBook(bk, null, true);
+                    previewBook(bk);
                 }
             });
         }
