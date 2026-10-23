@@ -47,6 +47,23 @@ public class Store extends SQLiteOpenHelper {
     public void onUpgrade(SQLiteDatabase db, int oldV, int newV) {
     }
 
+    @Override
+    public void onOpen(SQLiteDatabase db) {
+        super.onOpen(db);
+        ensureColumns(db);
+    }
+
+    private void ensureColumns(SQLiteDatabase db) {
+        try {
+            db.execSQL("ALTER TABLE books ADD COLUMN book_url TEXT");
+        } catch (Exception ignored) {
+        }
+        try {
+            db.execSQL("ALTER TABLE books ADD COLUMN source_url TEXT");
+        } catch (Exception ignored) {
+        }
+    }
+
     // ---------------- 书架 ----------------
 
     public JSONArray books() {

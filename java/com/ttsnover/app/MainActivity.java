@@ -2,6 +2,7 @@ package com.ttsnover.reader;
 
 import android.app.Activity;
 import android.app.AlertDialog;
+import android.content.Context;
 import android.content.DialogInterface;
 import android.content.Intent;
 import android.graphics.Color;
@@ -11,6 +12,7 @@ import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
 import android.text.TextUtils;
+import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
@@ -24,6 +26,7 @@ import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.ListView;
 import android.widget.ProgressBar;
+import android.widget.ScrollView;
 import android.widget.Spinner;
 import android.widget.TextView;
 import android.widget.Toast;
@@ -77,6 +80,91 @@ public class MainActivity extends Activity {
     @Override
     protected void onCreate(Bundle b) {
         super.onCreate(b);
+        try {
+            initApp(b);
+        } catch (final Throwable t) {
+            Log.e("MainActivity", "Failed to start", t);
+            showCrashUi(t);
+        }
+    }
+
+    private void showCrashUi(final Throwable t) {
+        try {
+            final String trace = Log.getStackTraceString(t);
+            try {
+                File dir = getFilesDir();
+                if (dir != null) {
+                    File f = new File(dir, "crash.log");
+                    FileOutputStream fos = new FileOutputStream(f);
+                    fos.write(trace.getBytes("UTF-8"));
+                    fos.close();
+                }
+            } catch (Exception ignored) {
+            }
+
+            LinearLayout root = new LinearLayout(this);
+            root.setOrientation(LinearLayout.VERTICAL);
+            root.setBackgroundColor(0xFF0B0F19);
+            root.setPadding(40, 60, 40, 40);
+
+            TextView tvTitle = new TextView(this);
+            tvTitle.setText("TTSNover 启动异常");
+            tvTitle.setTextSize(20);
+            tvTitle.setTextColor(0xFFEF4444);
+            tvTitle.setTypeface(null, Typeface.BOLD);
+            root.addView(tvTitle);
+
+            TextView tvHint = new TextView(this);
+            tvHint.setText("应用初始化时发生以下错误，请长按复制或截图反馈：");
+            tvHint.setTextSize(13);
+            tvHint.setTextColor(0xFF94A3B8);
+            tvHint.setPadding(0, 16, 0, 16);
+            root.addView(tvHint);
+
+            ScrollView sv = new ScrollView(this);
+            LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.MATCH_PARENT, 0, 1f);
+            sv.setLayoutParams(lp);
+
+            final TextView tvTrace = new TextView(this);
+            tvTrace.setText(trace);
+            tvTrace.setTextSize(12);
+            tvTrace.setTextColor(0xFFF8FAFC);
+            tvTrace.setBackgroundColor(0xFF131B2E);
+            tvTrace.setPadding(24, 24, 24, 24);
+            tvTrace.setTextIsSelectable(true);
+            sv.addView(tvTrace);
+            root.addView(sv);
+
+            Button btnCopy = new Button(this);
+            btnCopy.setText("复制错误日志");
+            btnCopy.setTextColor(Color.WHITE);
+            btnCopy.setBackgroundResource(R.drawable.bg_btn_primary);
+            btnCopy.setOnClickListener(new View.OnClickListener() {
+                @Override
+                public void onClick(View v) {
+                    try {
+                        android.content.ClipboardManager cm = (android.content.ClipboardManager)
+                                getSystemService(Context.CLIPBOARD_SERVICE);
+                        if (cm != null) {
+                            cm.setText(trace);
+                            Toast.makeText(MainActivity.this, "已复制到剪贴板", Toast.LENGTH_SHORT).show();
+                        }
+                    } catch (Exception ignored) {
+                    }
+                }
+            });
+            LinearLayout.LayoutParams btnLp = new LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.MATCH_PARENT, 120);
+            btnLp.topMargin = 24;
+            root.addView(btnCopy, btnLp);
+
+            setContentView(root);
+        } catch (Throwable ignored) {
+        }
+    }
+
+    private void initApp(Bundle b) {
         if (!Prefs.loggedIn()) {
             Api.goLogin(this);
             finish();
