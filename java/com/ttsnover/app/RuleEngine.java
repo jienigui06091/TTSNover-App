@@ -159,7 +159,18 @@ public class RuleEngine {
         }
         if (v instanceof Element) return cleanInline(((Element) v).text());
         if (v instanceof JSONObject || v instanceof JSONArray || v instanceof Map) return jsonStr(v);
+        if (v instanceof Number) return numStr(v);
         return cleanInline(String.valueOf(v));
+    }
+
+    /** JS 的数字都是 double：整数不能带 ".0"（{{1+1}} → "2"，和 Node 引擎一致）。 */
+    static String numStr(Object v) {
+        if (!(v instanceof Number)) return String.valueOf(v);
+        double d = ((Number) v).doubleValue();
+        if (!Double.isInfinite(d) && !Double.isNaN(d) && d == Math.rint(d) && Math.abs(d) < 1e15) {
+            return String.valueOf((long) d);
+        }
+        return String.valueOf(v);
     }
 
     static String cleanInline(String s) {
@@ -587,6 +598,17 @@ public class RuleEngine {
     /* ------------------------------------------------------------------ *
      *  正则
      * ------------------------------------------------------------------ */
+    /** 书源里的替换串用 JS 语义（$1 反向引用、$& 整体匹配），不能当字面量处理。
+     *  Java 的 $& 是 $0，非法引用会抛 IllegalArgumentException，这时才退回字面量。 */
+    static String replaceAll(Pattern p, String in, String repl) {
+        String r = repl.replace("$&", "$0").replace("\\n", "\n");
+        try {
+            return p.matcher(in).replaceAll(r);
+        } catch (IllegalArgumentException e) {
+            return p.matcher(in).replaceAll(Matcher.quoteReplacement(r));
+        }
+    }
+
     static Object applyRegex(Object val, String rule) {
         List<String> parts = splitTop(rule, "##");
         if (parts.size() < 2) return val;
@@ -599,13 +621,12 @@ public class RuleEngine {
         } catch (Exception e) {
             return val;
         }
-        String r = repl.replace("\\n", "\n");
         if (val instanceof List) {
             List<Object> out = new ArrayList<Object>();
-            for (Object o : (List<?>) val) out.add(p.matcher(String.valueOf(o)).replaceAll(Matcher.quoteReplacement(r)));
+            for (Object o : (List<?>) val) out.add(replaceAll(p, String.valueOf(o), repl));
             return out;
         }
-        return p.matcher(val == null ? "" : String.valueOf(val)).replaceAll(Matcher.quoteReplacement(r));
+        return replaceAll(p, val == null ? "" : String.valueOf(val), repl);
     }
 
     static Object applyRegexSpec(Object val, String spec) {
@@ -621,10 +642,10 @@ public class RuleEngine {
         }
         if (val instanceof List) {
             List<Object> out = new ArrayList<Object>();
-            for (Object o : (List<?>) val) out.add(p.matcher(o == null ? "" : String.valueOf(o)).replaceAll(Matcher.quoteReplacement(rep)));
+            for (Object o : (List<?>) val) out.add(replaceAll(p, o == null ? "" : String.valueOf(o), rep));
             return out;
         }
-        return p.matcher(val == null ? "" : String.valueOf(val)).replaceAll(Matcher.quoteReplacement(rep));
+        return replaceAll(p, val == null ? "" : String.valueOf(val), rep);
     }
 
     /* ------------------------------------------------------------------ *
@@ -731,7 +752,7 @@ public class RuleEngine {
             String rep;
             if (val == null || val == Undefined.instance) rep = "";
             else if (val instanceof Map || val instanceof List || val instanceof JSONObject || val instanceof JSONArray) rep = jsonStr(val);
-            else rep = String.valueOf(val);
+            else rep = numStr(val);   // JS 数字是 double，{{1+1}} 必须是 "2" 不是 "2.0"
             m.appendReplacement(sb, Matcher.quoteReplacement(rep));
         }
         m.appendTail(sb);
