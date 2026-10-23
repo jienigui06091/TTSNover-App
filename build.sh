@@ -11,8 +11,8 @@ BT="$SDK/build-tools/35.0.0"
 PLATFORM="$SDK/platforms/android-34/android.jar"
 KS="keystore/ttsnover.jks"
 KS_PASS="ttsnover2026"
-VERSION_CODE="${VERSION_CODE:-1}"
-VERSION_NAME="${VERSION_NAME:-1.0.0}"
+VERSION_CODE="${VERSION_CODE:-2}"
+VERSION_NAME="${VERSION_NAME:-1.1.0}"
 OUT="dist/TTSNover-${VERSION_NAME}.apk"
 
 for f in "$BT/aapt2" "$PLATFORM" "$KS"; do
@@ -35,11 +35,12 @@ echo "== 3/6 aapt2 link"
 
 echo "== 4/6 javac"
 find java build/gen -name '*.java' > build/srcs.txt
-javac --release 8 -nowarn -encoding UTF-8 -cp "$PLATFORM" -d build/classes @build/srcs.txt
+JARS=$(ls libs/*.jar 2>/dev/null | tr '\n' ':')
+javac --release 8 -nowarn -encoding UTF-8 -cp "$PLATFORM:$JARS" -d build/classes @build/srcs.txt
 
 echo "== 5/6 d8"
 find build/classes -name '*.class' > build/classes.txt
-"$BT/d8" --lib "$PLATFORM" --min-api 21 --release --output build/dex @build/classes.txt
+"$BT/d8" --lib "$PLATFORM" --min-api 21 --release --output build/dex @build/classes.txt libs/*.jar
 
 cp build/base.apk build/unsigned.apk
 ( cd build/dex && zip -q ../unsigned.apk classes.dex )

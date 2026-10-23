@@ -22,6 +22,9 @@ import android.widget.Spinner;
 import android.widget.TextView;
 import android.widget.Toast;
 
+import java.io.File;
+import java.io.FileOutputStream;
+
 import org.json.JSONArray;
 import org.json.JSONObject;
 
@@ -43,7 +46,7 @@ public class MainActivity extends Activity {
     private ListView lvShelf, lvSearch, lvSessionsHost;
     private TextView tvShelfInfo, tvShelfEmpty, tvStat, tvAccount, tvServer, tvKeyState, tvVer;
     private EditText etQ, etKey, etVoice, etSpeed;
-    private Button btnRefresh, btnSearch, btnSaveKey, btnSaveTts, btnTtsTest, btnSessions, btnLogout, btnImportSrc;
+    private Button btnRefresh, btnSearch, btnSaveKey, btnSaveTts, btnTtsTest, btnSessions, btnLogout, btnImportSrc, btnSrcManage;
     private Spinner spProvider;
     private TextView tvKeyLabel;
     /** 和 tts.py 里的 PRESETS 对齐：顺序不能乱 */
@@ -155,6 +158,12 @@ public class MainActivity extends Activity {
                 pickSourceFile();
             }
         });
+        btnSrcManage.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                openSourceManager();
+            }
+        });
         spProvider.setAdapter(new ArrayAdapter<String>(this,
                 android.R.layout.simple_spinner_dropdown_item, PROV_LABEL));
         spProvider.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
@@ -175,8 +184,10 @@ public class MainActivity extends Activity {
             }
         });
 
-        tvAccount.setText(Prefs.user());
-        tvServer.setText(Prefs.base());
+        tvAccount.setText("本机模式 · 不连服务器");
+        tvServer.setText("书源、书架、阅读进度、API Key 全部存在这台手机上");
+        btnSessions.setVisibility(View.GONE);
+        btnLogout.setVisibility(View.GONE);
         loadShelf();
         loadMe();
     }
@@ -209,6 +220,7 @@ public class MainActivity extends Activity {
         btnSessions = findViewById(R.id.btnSessions);
         btnLogout = findViewById(R.id.btnLogout);
         btnImportSrc = findViewById(R.id.btnImportSrc);
+        btnSrcManage = findViewById(R.id.btnSrcManage);
         spProvider = findViewById(R.id.spProvider);
         tvKeyLabel = findViewById(R.id.tvKeyLabel);
     }
@@ -503,12 +515,12 @@ public class MainActivity extends Activity {
         JSONObject o = keysCache.optJSONObject(PROV[i]);
         boolean has = o != null && o.optBoolean("has");
         if (PROV[i].isEmpty()) {
-            tvKeyLabel.setText("自定义接口（用网页版里那套 url/headers/body）");
-            tvKeyState.setText("Key 在网页版里配好就行，这里不用填");
+            tvKeyLabel.setText("自定义接口（url / headers / body，填你自己的 TTS 服务）");
+            tvKeyState.setText("自定义接口不需要 Key，url 里可以用 {{text}} / {{voice}} / {{speed}}");
             tvKeyState.setTextColor(getResources().getColor(R.color.fg2));
             return;
         }
-        tvKeyLabel.setText(PROV_LABEL[i] + " 的 API Key（服务端加密保存，只回掩码）");
+        tvKeyLabel.setText(PROV_LABEL[i] + " 的 API Key（只存本机，界面只显示掩码）");
         tvKeyState.setText(has ? "已配置：" + o.optString("masked") : "还没配置这个引擎的 Key，朗读会失败");
         tvKeyState.setTextColor(getResources().getColor(has ? R.color.accent2 : R.color.warn));
     }
@@ -560,6 +572,93 @@ public class MainActivity extends Activity {
                         @Override
                         public void run() {
                             Toast.makeText(MainActivity.this, "导入失败：" + Api.errText(e), Toast.LENGTH_LONG).show();
+                        }
+                    });
+                }
+            }
+        });
+    }
+
+    /** 书源管理：多选启用状态 + 导出到本机文件。 */
+    private void openSourceManager() {
+        try {
+            final JSONArray arr = Api.json("/api/sources/list").optJSONArray("sources");
+            if (arr == null || arr.length() == 0) {
+                Toast.makeText(this, "还没有书源，先导入 JSON", Toast.LENGTH_SHORT).show();
+                return;
+            }
+            final String[] labels = new String[arr.length()];
+            final boolean[] checked = new boolean[arr.length()];
+            final String[] urls = new String[arr.length()];
+            for (int i = 0; i < arr.length(); i++) {
+                JSONObject s = arr.optJSONObject(i);
+                urls[i] = s.optString("url");
+                labels[i] = s.optString("name") + (s.optBoolean("enabled") ? "" : "（已停用）");
+                checked[i] = s.optBoolean("enabled");
+            }
+            new AlertDialog.Builder(this)
+                    .setTitle("书源管理 · " + arr.length() + " 个")
+                    .setMultiChoiceItems(labels, checked, new DialogInterface.OnMultiChoiceClickListener() {
+                        @Override
+                        public void onClick(DialogInterface d, int which, boolean isChecked) {
+                            checked[which] = isChecked;
+                        }
+                    })
+                    .setPositiveButton("保存启用状态", new DialogInterface.OnClickListener() {
+                        @Override
+                        public void onClick(DialogInterface d, int w) {
+                            pool.execute(new Runnable() {
+                                @Override
+                                public void run() {
+                                    Store db = Store.get(MainActivity.this);
+                                    for (int i = 0; i < urls.length; i++) db.setSourceEnabled(urls[i], checked[i]);
+                                    ui.post(new Runnable() {
+                                        @Override
+                                        public void run() {
+                                            Toast.makeText(MainActivity.this, "已保存启用状态", Toast.LENGTH_SHORT).show();
+                                            loadSearchMeta();
+                                        }
+                                    });
+                                }
+                            });
+                        }
+                    })
+                    .setNeutralButton("导出到文件", new DialogInterface.OnClickListener() {
+                        @Override
+                        public void onClick(DialogInterface d, int w) {
+                            exportSources();
+                        }
+                    })
+                    .setNegativeButton("关闭", null)
+                    .show();
+        } catch (final Exception e) {
+            Toast.makeText(this, "读取书源失败：" + Api.errText(e), Toast.LENGTH_LONG).show();
+        }
+    }
+
+    /** 把书源导出成 JSON，放在 App 外部目录，USB 能直接拷走。 */
+    private void exportSources() {
+        pool.execute(new Runnable() {
+            @Override
+            public void run() {
+                try {
+                    String raw = Store.get(MainActivity.this).exportSources();
+                    File dir = getExternalFilesDir(null);
+                    final File f = new File(dir, "sources.json");
+                    FileOutputStream fo = new FileOutputStream(f);
+                    fo.write(raw.getBytes("UTF-8"));
+                    fo.close();
+                    ui.post(new Runnable() {
+                        @Override
+                        public void run() {
+                            Toast.makeText(MainActivity.this, "已导出到 " + f.getAbsolutePath(), Toast.LENGTH_LONG).show();
+                        }
+                    });
+                } catch (final Exception e) {
+                    ui.post(new Runnable() {
+                        @Override
+                        public void run() {
+                            Toast.makeText(MainActivity.this, "导出失败：" + Api.errText(e), Toast.LENGTH_LONG).show();
                         }
                     });
                 }

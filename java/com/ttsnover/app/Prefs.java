@@ -20,7 +20,7 @@ public class Prefs {
 
     public static void setUser(String v) { sp().edit().putString("user", v == null ? "" : v).apply(); }
 
-    public static boolean loggedIn() { return !token().isEmpty(); }
+    public static boolean loggedIn() { return true; }   // 本地模式：没有登录，永远可用
 
     // ---- 朗读偏好：App 本地保存，每次合成时随请求发过去，避免和网页设置互相覆盖 ----
     public static String ttsProvider() { return sp().getString("ttsProvider", "mimo"); }

@@ -132,6 +132,10 @@
                         android:layout_width="match_parent" android:layout_height="40dp"
                         android:minHeight="0dp" android:textSize="13sp"
                         android:layout_marginTop="8dp" android:text="导入书源 JSON" />
+                    <Button android:id="@+id/btnSrcManage" style="@style/Btn"
+                        android:layout_width="match_parent" android:layout_height="40dp"
+                        android:minHeight="0dp" android:textSize="13sp"
+                        android:layout_marginTop="8dp" android:text="书源管理（启用/导出）" />
                     <Button android:id="@+id/btnTtsTest" style="@style/Btn"
                         android:layout_width="match_parent" android:layout_height="40dp"
                         android:minHeight="0dp" android:textSize="13sp"
