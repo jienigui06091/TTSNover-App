@@ -417,7 +417,10 @@ public class MainActivity extends Activity {
                                     if (o != null) shelf.add(o);
                                 }
                             }
-                            shelfAdapter.notifyDataSetChanged();
+                            // loadShelf() may finish before initApp() has created the adapter.
+                            // This happens on a fast local SQLite read during cold start.
+                            if (shelfAdapter != null) shelfAdapter.notifyDataSetChanged();
+                            if (tvShelfInfo == null || tvShelfEmpty == null) return;
                             tvShelfInfo.setText(shelf.size() + " 本");
                             boolean empty = shelf.isEmpty();
                             tvShelfEmpty.setVisibility(empty ? View.VISIBLE : View.GONE);
@@ -1283,7 +1286,9 @@ public class MainActivity extends Activity {
     @Override
     protected void onResume() {
         super.onResume();
-        if (Prefs.loggedIn()) loadShelf();
+        // onResume is invoked during onCreate, before initApp() has installed adapters.
+        // initApp() performs the first load only after its UI setup completes.
+        if (Prefs.loggedIn() && shelfAdapter != null) loadShelf();
     }
 
     @Override
