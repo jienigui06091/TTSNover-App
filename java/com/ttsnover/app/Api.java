@@ -349,11 +349,27 @@ public class Api {
             }
         }
         for (Future<JSONObject> f : fs) f.cancel(true);
+        int disabled = 0;
+        for (int i = 0; i < results.length(); i++) {
+            JSONObject g = results.optJSONObject(i);
+            if (g != null && isTimeoutError(g.optString("error", ""))) {
+                db().setSourceEnabled(g.optString("sid"), false);
+                disabled++;
+            }
+        }
         JSONObject out = new JSONObject();
         out.put("results", results);
         out.put("stats", new JSONObject().put("ms", System.currentTimeMillis() - t0)
-                .put("sources", srcs.size()).put("ok", results.length()).put("errors", errors));
+                .put("sources", srcs.size()).put("ok", results.length()).put("errors", errors)
+                .put("disabled", disabled));
         return out;
+    }
+
+    /** 网络连接/读取超时才自动停用；解析失败、403 等可能是临时或规则问题，不误杀。 */
+    static boolean isTimeoutError(String error) {
+        if (error == null) return false;
+        String s = error.toLowerCase();
+        return s.contains("timeout") || s.contains("timed out") || s.contains("sockettimeoutexception");
     }
 
     // ---------------- 设置 / Key ----------------

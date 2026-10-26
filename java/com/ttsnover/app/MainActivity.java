@@ -583,11 +583,13 @@ public class MainActivity extends Activity {
 
                             JSONObject st = r.optJSONObject("stats");
                             String ms = st != null ? String.valueOf(st.optInt("ms")) : "?";
+                            int disabled = st == null ? 0 : st.optInt("disabled");
+                            String autoDisabled = disabled > 0 ? " · 已自动停用 " + disabled + " 个超时源" : "";
                             if (totalBooks == 0) {
-                                tvStat.setText("共搜索 " + srcAll + " 个书源，未找到匹配书籍 · " + ms + "ms");
+                                tvStat.setText("共搜索 " + srcAll + " 个书源，未找到匹配书籍 · " + ms + "ms" + autoDisabled);
                                 if (hsvSources != null) hsvSources.setVisibility(View.GONE);
                             } else {
-                                tvStat.setText("在 " + srcOk + " 个书源中找到 " + totalBooks + " 本书 · " + ms + "ms · 点卡片详情试读，点右侧+加书架");
+                                tvStat.setText("在 " + srcOk + " 个书源中找到 " + totalBooks + " 本书 · " + ms + "ms · 点卡片详情试读，点右侧+加书架" + autoDisabled);
                                 buildSourceChips(totalBooks);
                             }
                             refreshSearchDisplayList();
