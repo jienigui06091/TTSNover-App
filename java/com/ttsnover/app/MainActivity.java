@@ -236,7 +236,7 @@ public class MainActivity extends Activity {
                 if (pos < 0 || pos >= found.size()) return;
                 JSONObject bk = found.get(pos);
                 if (bk.optBoolean("_is_header", false)) return;
-                showBookDetailsDialog(bk);
+                previewBook(bk);
             }
         });
 
