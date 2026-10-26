@@ -105,6 +105,7 @@ public class Api {
             if (p.startsWith("/api/books")) return booksRoute(method, p, body);
             if (p.startsWith("/api/src/search")) return search(qs(p, "q"));
             // Preview is deliberately read-only: search / detail / preview never writes a book.
+            if (p.startsWith("/api/src/preview/ch")) return previewChapter(body);
             if (p.startsWith("/api/src/preview")) return previewBook(body);
             if (p.startsWith("/api/src/add")) return addBook(body);
             if (p.startsWith("/api/sources/export")) {
@@ -234,10 +235,32 @@ public class Api {
             String s = line.trim();
             if (!s.isEmpty()) paras.put(s);
         }
+        JSONArray tocArr = new JSONArray();
+        for (JSONObject c : toc) tocArr.put(c);
         return new JSONObject()
                 .put("title", chapter.optString("title", first.optString("name", bk.optString("name", ""))))
                 .put("paras", paras).put("count", paras.length())
-                .put("chapters", toc.size()).put("preview", true);
+                .put("chapters", toc.size()).put("toc", tocArr).put("preview", true);
+    }
+
+    /** 试读的任意章节：按原书源即时抓取，不保存书架/章节/正文缓存。 */
+    static JSONObject previewChapter(JSONObject body) throws Exception {
+        if (body == null) throw new Err(400, "缺参数");
+        String sid = body.optString("sid", "");
+        JSONObject src = db().sourceByUrl(sid);
+        if (src == null) throw new Err(404, "书源不存在（可能刚被删了）");
+        String url = body.optString("url", "").trim();
+        if (url.isEmpty()) throw new Err(400, "缺章节链接");
+        JSONObject chapter = RuleEngine.content(src, url);
+        String content = chapter.optString("content", "").trim();
+        if (content.isEmpty()) throw new Err(0, "这一章没抓到正文（源可能改版）");
+        JSONArray paras = new JSONArray();
+        for (String line : content.split("\\n")) {
+            String s = line.trim();
+            if (!s.isEmpty()) paras.put(s);
+        }
+        return new JSONObject().put("title", chapter.optString("title", body.optString("name", "")))
+                .put("paras", paras).put("count", paras.length()).put("preview", true);
     }
 
     static JSONObject addBook(JSONObject body) throws Exception {

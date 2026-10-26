@@ -38,6 +38,9 @@ public class ReaderActivity extends Activity {
 
     private int bid, idx, count;
     private String bookTitle;
+    private boolean previewMode = false;
+    private String previewSid = "", previewBookUrl = "";
+    private JSONArray previewToc = new JSONArray();
     private float pendingOff = -1;
 
     private View rootReader;
@@ -62,6 +65,16 @@ public class ReaderActivity extends Activity {
         idx = getIntent().getIntExtra("idx", 0);
         count = getIntent().getIntExtra("count", 0);
         bookTitle = getIntent().getStringExtra("title");
+        previewMode = getIntent().getBooleanExtra("preview", false);
+        previewSid = getIntent().getStringExtra("previewSid");
+        previewBookUrl = getIntent().getStringExtra("previewBookUrl");
+        if (previewSid == null) previewSid = "";
+        if (previewBookUrl == null) previewBookUrl = "";
+        if (previewMode) {
+            try { previewToc = new JSONArray(getIntent().getStringExtra("previewToc")); }
+            catch (Exception ignored) { previewToc = new JSONArray(); }
+            if (count <= 0) count = previewToc.length();
+        }
         pendingOff = getIntent().getFloatExtra("off", -1f);
 
         rootReader = findViewById(R.id.rootReader);
@@ -81,7 +94,7 @@ public class ReaderActivity extends Activity {
         btnStyle = findViewById(R.id.btnStyle);
 
         if (bookTitle != null) {
-            tvBookSubtitle.setText(bookTitle);
+            tvBookSubtitle.setText(previewMode ? bookTitle + " · 试读模式（未加入书架）" : bookTitle);
         }
 
         currentFontSize = Prefs.readerFontSize();
@@ -122,6 +135,10 @@ public class ReaderActivity extends Activity {
         btnToc.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
+                if (previewMode) {
+                    Toast.makeText(ReaderActivity.this, "试读可用上一章 / 下一章连续阅读；加入书架后可打开完整目录和朗读", Toast.LENGTH_LONG).show();
+                    return;
+                }
                 Intent i = new Intent(ReaderActivity.this, TocActivity.class);
                 i.putExtra("bid", bid);
                 i.putExtra("title", bookTitle);
@@ -327,6 +344,10 @@ public class ReaderActivity extends Activity {
     private boolean playAfterPerm = false;
 
     private void onPlayClicked() {
+        if (previewMode) {
+            Toast.makeText(this, "试读模式不保存书籍；加入书架后可使用整本朗读和续读", Toast.LENGTH_LONG).show();
+            return;
+        }
         if (Build.VERSION.SDK_INT >= 33
                 && checkSelfPermission("android.permission.POST_NOTIFICATIONS") != PackageManager.PERMISSION_GRANTED) {
             playAfterPerm = true;
@@ -454,10 +475,22 @@ public class ReaderActivity extends Activity {
             @Override
             public void run() {
                 try {
-                    final JSONObject r = Api.json("/api/books/" + bid + "/ch/" + want);
+                    final JSONObject r;
+                    if (previewMode) {
+                        JSONObject ch = previewToc.optJSONObject(want);
+                        if (ch == null) throw new Api.Err(404, "没有第 " + (want + 1) + " 章");
+                        JSONObject body = new JSONObject();
+                        body.put("sid", previewSid);
+                        body.put("url", ch.optString("url", ""));
+                        body.put("name", ch.optString("name", "第 " + (want + 1) + " 章"));
+                        body.put("book", previewBookUrl);
+                        r = Api.post("/api/src/preview/ch", body);
+                    } else {
+                        r = Api.json("/api/books/" + bid + "/ch/" + want);
+                    }
                     final JSONArray ps = r.optJSONArray("paras");
                     final String t = r.optString("title", loadingCh);
-                    final int n = r.optInt("count", count);
+                    final int n = previewMode ? previewToc.length() : r.optInt("count", count);
                     ui.post(new Runnable() {
                         @Override
                         public void run() {
@@ -529,6 +562,7 @@ public class ReaderActivity extends Activity {
     }
 
     private void saveProgress() {
+        if (previewMode) return;
         final int ch = idx;
         final float off = scrollFraction();
         pool.execute(new Runnable() {

@@ -830,16 +830,15 @@ public class MainActivity extends Activity {
                     ui.post(new Runnable() {
                         @Override
                         public void run() {
-                            String title = r.optString("title", name);
-                            JSONArray paras = r.optJSONArray("paras");
-                            StringBuilder text = new StringBuilder();
-                            if (paras != null) {
-                                for (int i = 0; i < paras.length(); i++) {
-                                    if (i > 0) text.append("\n\n");
-                                    text.append(paras.optString(i));
-                                }
-                            }
-                            showPreviewDialog(name, title, text.toString(), r.optInt("chapters"));
+                            Intent i = new Intent(MainActivity.this, ReaderActivity.class);
+                            i.putExtra("preview", true);
+                            i.putExtra("previewSid", sid);
+                            i.putExtra("previewBookUrl", bk.optString("url"));
+                            i.putExtra("previewToc", r.optJSONArray("toc").toString());
+                            i.putExtra("title", name);
+                            i.putExtra("count", r.optInt("chapters"));
+                            i.putExtra("idx", 0);
+                            startActivity(i);
                         }
                     });
                 } catch (final Exception e) {
