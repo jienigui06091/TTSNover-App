@@ -1077,10 +1077,10 @@ public class MainActivity extends Activity {
                             });
                         }
                     })
-                    .setNeutralButton("导出到文件", new DialogInterface.OnClickListener() {
+                    .setNeutralButton("删除书源", new DialogInterface.OnClickListener() {
                         @Override
                         public void onClick(DialogInterface d, int w) {
-                            exportSources();
+                            chooseSourceToDelete(arr);
                         }
                     })
                     .setNegativeButton("关闭", null)
@@ -1088,6 +1088,55 @@ public class MainActivity extends Activity {
         } catch (final Exception e) {
             Toast.makeText(this, "读取书源失败：" + Api.errText(e), Toast.LENGTH_LONG).show();
         }
+    }
+
+    /** 明确选择并二次确认，避免误删导入的书源。 */
+    private void chooseSourceToDelete(final JSONArray arr) {
+        final String[] labels = new String[arr.length()];
+        for (int i = 0; i < arr.length(); i++) {
+            JSONObject s = arr.optJSONObject(i);
+            labels[i] = s == null ? "未知书源" : s.optString("name", "未知书源");
+        }
+        new AlertDialog.Builder(this)
+                .setTitle("选择要删除的书源")
+                .setItems(labels, new DialogInterface.OnClickListener() {
+                    @Override public void onClick(DialogInterface d, final int which) {
+                        final JSONObject s = arr.optJSONObject(which);
+                        if (s == null) return;
+                        new AlertDialog.Builder(MainActivity.this)
+                                .setTitle("删除书源？")
+                                .setMessage("将删除「" + s.optString("name") + "」。已加入书架的书不受影响。")
+                                .setNegativeButton("取消", null)
+                                .setPositiveButton("删除", new DialogInterface.OnClickListener() {
+                                    @Override public void onClick(DialogInterface x, int y) {
+                                        deleteSource(s.optString("url"), s.optString("name"));
+                                    }
+                                }).show();
+                    }
+                }).setNegativeButton("取消", null).show();
+    }
+
+    private void deleteSource(final String url, final String name) {
+        pool.execute(new Runnable() {
+            @Override public void run() {
+                try {
+                    JSONObject body = new JSONObject().put("url", url);
+                    Api.post("/api/sources/delete", body);
+                    ui.post(new Runnable() {
+                        @Override public void run() {
+                            Toast.makeText(MainActivity.this, "已删除书源：「" + name + "」", Toast.LENGTH_SHORT).show();
+                            loadSearchMeta();
+                        }
+                    });
+                } catch (final Exception e) {
+                    ui.post(new Runnable() {
+                        @Override public void run() {
+                            Toast.makeText(MainActivity.this, "删除失败：" + Api.errText(e), Toast.LENGTH_LONG).show();
+                        }
+                    });
+                }
+            }
+        });
     }
 
     /** 把书源导出成 JSON，放在 App 外部目录，USB 能直接拷走。 */

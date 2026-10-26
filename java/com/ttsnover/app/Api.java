@@ -8,6 +8,8 @@ import org.json.JSONObject;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.Callable;
+import java.util.concurrent.CompletionService;
+import java.util.concurrent.ExecutorCompletionService;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
@@ -114,6 +116,12 @@ public class Api {
             }
             if (p.startsWith("/api/sources/import")) {
                 return db().importSources(body == null ? "" : body.optString("raw", ""));
+            }
+            if (p.startsWith("/api/sources/delete")) {
+                String url = body == null ? qs(p, "url") : body.optString("url", "");
+                if (url.trim().isEmpty()) throw new Err(400, "缺书源地址");
+                db().deleteSource(url);
+                return new JSONObject().put("ok", true).put("total", db().sourceCount(false));
             }
             if (p.startsWith("/api/sources")) {
                 return new JSONObject().put("total", db().sourceCount(false))
@@ -290,8 +298,11 @@ public class Api {
         final List<JSONObject> srcs = db().enabledSources();
         if (srcs.isEmpty()) throw new Err(0, "还没有书源：我的 → 导入书源");
         List<Future<JSONObject>> fs = new ArrayList<Future<JSONObject>>();
+        CompletionService<JSONObject> completed = new ExecutorCompletionService<JSONObject>(SEARCH_POOL);
+        // Keep a group for every finished source, including its error. The UI can then
+        // show whether imported sources were unreachable, unsupported, or simply empty.
         for (final JSONObject s : srcs) {
-            fs.add(SEARCH_POOL.submit(new Callable<JSONObject>() {
+            fs.add(completed.submit(new Callable<JSONObject>() {
                 @Override
                 public JSONObject call() {
                     JSONObject g = new JSONObject();
@@ -321,20 +332,27 @@ public class Api {
             }));
         }
         JSONArray results = new JSONArray();
+        int errors = 0;
         long deadline = t0 + 12000;
-        for (Future<JSONObject> f : fs) {
+        // Do not wait for the first slow source: collect whichever sources finish first.
+        for (int done = 0; done < fs.size(); done++) {
             long left = deadline - System.currentTimeMillis();
             if (left <= 0) break;
             try {
-                results.put(f.get(left, TimeUnit.MILLISECONDS));
-            } catch (Exception ignored) {
+                Future<JSONObject> f = completed.poll(left, TimeUnit.MILLISECONDS);
+                if (f == null) break;
+                JSONObject g = f.get();
+                results.put(g);
+                if (!g.optString("error", "").trim().isEmpty()) errors++;
+            } catch (Exception e) {
+                errors++;
             }
         }
         for (Future<JSONObject> f : fs) f.cancel(true);
         JSONObject out = new JSONObject();
         out.put("results", results);
         out.put("stats", new JSONObject().put("ms", System.currentTimeMillis() - t0)
-                .put("sources", srcs.size()).put("ok", results.length()));
+                .put("sources", srcs.size()).put("ok", results.length()).put("errors", errors));
         return out;
     }
 
